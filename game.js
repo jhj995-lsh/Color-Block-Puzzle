@@ -199,14 +199,16 @@
   }
 
   function spawnFlyingTile(x, y, color) {
+    const life = 1.1;
     state.flyingTiles.push({
       x,
       y,
-      vx: (Math.random() - 0.5) * 140,
-      vy: -60 - Math.random() * 80,
+      vx: (Math.random() - 0.5) * 110,
+      vy: -90 - Math.random() * 70,
       rotation: (Math.random() - 0.5) * 0.7,
       angularVelocity: (Math.random() - 0.5) * 10,
-      life: 0.55,
+      life,
+      maxLife: life,
       color,
     });
   }
@@ -242,7 +244,7 @@
     for (const tile of state.flyingTiles) {
       tile.x += tile.vx * dt;
       tile.y += tile.vy * dt;
-      tile.vy += 240 * dt;
+      tile.vy += 320 * dt;
       tile.rotation += tile.angularVelocity * dt;
       tile.life -= dt;
     }
@@ -554,8 +556,10 @@
 
   function drawFlyingTiles() {
     for (const tile of state.flyingTiles) {
+      const progress = 1 - tile.life / tile.maxLife;
+      const fade = Math.pow(Math.max(0, 1 - progress), 0.35);
       ctx.save();
-      ctx.globalAlpha = Math.max(0, tile.life * 1.7);
+      ctx.globalAlpha = fade;
       ctx.translate(tile.x, tile.y);
       ctx.rotate(tile.rotation);
       ctx.fillStyle = tile.color;
