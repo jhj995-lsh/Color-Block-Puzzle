@@ -4,15 +4,15 @@ export const BOARD_PRESETS = {
     label: "竖屏盘面",
     stage: {
       width: 402,
-      height: 430,
+      height: 880,
     },
     board: {
-      x: 3,
-      y: 40,
-      cols: 18,
-      rows: 12,
-      cell: 22,
-      radius: 7,
+      x: 12,
+      y: 116,
+      cols: 12,
+      rows: 18,
+      cell: 31.5,
+      radius: 10,
     },
     fillRatio: 0.64,
     minPlayableSpaces: 8,
@@ -53,6 +53,12 @@ export function getBoardSettings(presetName) {
   return BOARD_PRESETS[presetName] || BOARD_PRESETS.portrait;
 }
 
+export function getBoardDisplayLabel(settings) {
+  const longSide = Math.max(settings.board.cols, settings.board.rows);
+  const shortSide = Math.min(settings.board.cols, settings.board.rows);
+  return `${longSide}×${shortSide}`;
+}
+
 export function getStageRatio(presetName) {
   const settings = getBoardSettings(presetName);
   return settings.stage.width / settings.stage.height;
@@ -88,15 +94,20 @@ export function fitStageFrame({
 }) {
   const settings = getBoardSettings(presetName);
   const aspect = getStageRatio(presetName);
+  const immersive = chromeMode !== "menu";
   const chromePadding =
     chromeMode === "immersive-portrait"
-      ? { horizontal: 6, top: 10, bottom: 10 }
+      ? { horizontal: 2, top: 0, bottom: 0 }
       : chromeMode === "immersive-landscape"
-        ? { horizontal: 12, top: 8, bottom: 8 }
+        ? { horizontal: 8, top: 0, bottom: 0 }
         : { horizontal: 16, top: 16, bottom: 16 };
   const availableHeight = Math.max(
     1,
-    viewportHeight - safeAreaTop - safeAreaBottom - chromePadding.top - chromePadding.bottom
+    viewportHeight -
+      (immersive ? 0 : safeAreaTop) -
+      (immersive ? 0 : safeAreaBottom) -
+      chromePadding.top -
+      chromePadding.bottom
   );
   const availableWidth = Math.max(1, viewportWidth - chromePadding.horizontal * 2);
   const width = Math.min(settings.stage.width, availableWidth, availableHeight * aspect);

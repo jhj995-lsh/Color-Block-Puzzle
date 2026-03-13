@@ -1,4 +1,5 @@
 import { UI_COPY } from "./config.js";
+import { getBoardDisplayLabel } from "./layout.js";
 
 export function getOverlayView(state, settings) {
   const screen = state.overlayScreen || "play";
@@ -34,7 +35,7 @@ export function getOverlayView(state, settings) {
       <section class="overlay-card overlay-card--start">
         <p class="overlay-eyebrow">${settings.label}</p>
         <h2>${UI_COPY.title}</h2>
-        <p>当前开局会使用 <strong>${settings.board.cols}×${settings.board.rows}</strong> 盘面，局时 <strong>${settings.maxTime}</strong> 秒。</p>
+        <p>当前开局会使用 <strong>${getBoardDisplayLabel(settings)}</strong> 盘面，局时 <strong>${settings.maxTime}</strong> 秒。</p>
         <div class="overlay-actions">
           <button class="overlay-button overlay-button--primary" data-overlay-action="start-game">开始</button>
           <button class="overlay-button" data-overlay-action="open-leaderboard">排行榜</button>

@@ -23,10 +23,15 @@ test("getDefaultBoardPreset mirrors the current layout mode", () => {
   assert.equal(getDefaultBoardPreset("landscape"), "landscape");
 });
 
-test("portrait board settings use the mobile 18x12 tuned preset", () => {
+test("portrait board settings use a tall 12x18 grid that fits portrait phones", () => {
   const portrait = getBoardSettings("portrait");
-  assert.equal(portrait.board.cols, 18);
-  assert.equal(portrait.board.rows, 12);
+  const boardWidth = portrait.board.cols * portrait.board.cell;
+  const boardHeight = portrait.board.rows * portrait.board.cell;
+
+  assert.equal(portrait.board.cols, 12);
+  assert.equal(portrait.board.rows, 18);
+  assert.equal(boardHeight > boardWidth, true);
+  assert.equal(boardWidth >= portrait.stage.width * 0.9, true);
   assert.equal(portrait.fillRatio, 0.64);
   assert.equal(portrait.minPlayableSpaces, 8);
   assert.equal(portrait.maxTime, 110);
@@ -85,6 +90,17 @@ test("fitStageFrame gives the immersive portrait stage near full width on iPhone
 
   assert.equal(frame.width >= 378, true);
   assert.equal(frame.width <= 402, true);
+  assert.equal(frame.height >= 850, true);
+});
+
+test("portrait stage keeps clear top and bottom gutters for floating controls", () => {
+  const portrait = getBoardSettings("portrait");
+  const panelTop = portrait.board.y - 12;
+  const panelBottom = panelTop + portrait.board.rows * portrait.board.cell + 24;
+  const bottomGutter = portrait.stage.height - panelBottom;
+
+  assert.equal(panelTop >= 100, true);
+  assert.equal(bottomGutter >= 180, true);
 });
 
 test("fitStageFrame keeps the immersive landscape stage visible on iPhone 17", () => {

@@ -54,7 +54,7 @@ button {
 
 .top-hud {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .app-shell[data-chrome-mode^="immersive"] .top-hud {
@@ -84,15 +84,15 @@ button {
 .hud-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .hud-pill,
 .hud-audio {
   border: 1px solid var(--panel-border);
   background: var(--panel-bg);
-  border-radius: 18px;
-  min-height: 56px;
+  border-radius: 16px;
+  min-height: 48px;
   box-shadow: var(--shadow);
 }
 
@@ -100,25 +100,24 @@ button {
   display: grid;
   align-content: center;
   justify-items: start;
-  padding: 8px 14px;
+  padding: 6px 12px;
   gap: 2px;
 }
 
 .hud-pill span {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: #c18d94;
 }
 
 .hud-pill strong {
-  font-size: 1.15rem;
+  font-size: 1.02rem;
   color: var(--text-strong);
 }
 
 .hud-audio {
-  grid-column: 1 / -1;
   border: none;
   color: var(--text-strong);
-  padding: 0 16px;
+  padding: 0 12px;
   background:
     linear-gradient(120deg, rgba(255, 255, 255, 0.88), rgba(239, 250, 247, 0.92));
 }
@@ -135,7 +134,7 @@ button {
 .app-shell[data-chrome-mode^="immersive"] .stage-shell {
   min-height: 100dvh;
   width: 100%;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .stage-frame {
@@ -182,18 +181,18 @@ button {
 }
 
 .game-hud {
-  top: calc(var(--safe-area-top) + 10px);
+  top: calc(var(--safe-area-top) + 6px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
 }
 
 .game-hud-pill {
-  min-width: 88px;
-  padding: 8px 12px;
-  border-radius: 18px;
+  min-width: 78px;
+  padding: 6px 10px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(255, 183, 189, 0.35);
   box-shadow: var(--glass-shadow);
@@ -202,22 +201,22 @@ button {
 
 .game-hud-pill span {
   display: block;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: #ba848d;
 }
 
 .game-hud-pill strong {
   display: block;
-  margin-top: 2px;
-  font-size: 1.06rem;
+  margin-top: 1px;
+  font-size: 0.96rem;
   color: var(--text-strong);
 }
 
 .game-audio {
-  top: calc(var(--safe-area-top) + 10px);
-  right: 10px;
-  width: 46px;
-  height: 46px;
+  top: calc(var(--safe-area-top) + 6px);
+  right: 8px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 1px solid rgba(255, 183, 189, 0.35);
   background: rgba(255, 255, 255, 0.84);
@@ -228,32 +227,33 @@ button {
 
 .status-toast {
   left: 50%;
-  bottom: calc(var(--safe-area-bottom) + 78px);
+  bottom: calc(var(--safe-area-bottom) + 60px);
   transform: translateX(-50%);
-  width: min(calc(100% - 24px), 344px);
+  width: min(calc(100% - 28px), 328px);
   margin: 0;
-  padding: 12px 14px;
-  border-radius: 18px;
+  padding: 10px 12px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid rgba(255, 183, 189, 0.28);
   box-shadow: var(--glass-shadow);
-  line-height: 1.4;
+  line-height: 1.32;
   text-align: center;
   pointer-events: none;
   backdrop-filter: blur(14px);
+  font-size: 0.95rem;
 }
 
 .game-actions {
   left: 12px;
   right: 12px;
-  bottom: calc(var(--safe-area-bottom) + 14px);
+  bottom: calc(var(--safe-area-bottom) + 10px);
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .control-fab,
 .sheet-button {
-  min-height: 48px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid rgba(255, 176, 183, 0.38);
   background: rgba(255, 255, 255, 0.84);
@@ -268,7 +268,7 @@ button {
 }
 
 .control-fab--secondary {
-  flex: 0 0 108px;
+  flex: 0 0 92px;
 }
 
 .controls-sheet {

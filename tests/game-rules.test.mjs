@@ -29,8 +29,8 @@ test("restartGame locks the current layout into the round preset", () => {
   restartGame(state);
 
   assert.equal(state.boardPreset, "portrait");
-  assert.equal(state.grid.length, 12);
-  assert.equal(state.grid[0].length, 18);
+  assert.equal(state.grid.length, 18);
+  assert.equal(state.grid[0].length, 12);
   assert.equal(state.timeLeft, 110);
   assert.equal(state.overlayScreen, null);
   assert.equal(state.chromeMode, "immersive-portrait");

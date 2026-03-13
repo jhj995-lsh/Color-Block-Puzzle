@@ -1,4 +1,5 @@
 import { paletteFor, getDisplayBoardSettings } from "./game-rules.js";
+import { getBoardDisplayLabel } from "./layout.js";
 
 export function renderGame(ctx, state) {
   const settings = getDisplayBoardSettings(state);
@@ -238,7 +239,7 @@ function drawParticles(ctx, particles) {
 }
 
 function drawBoardBadge(ctx, settings, stage) {
-  const badge = `${settings.label} · ${settings.board.cols}×${settings.board.rows}`;
+  const badge = `${settings.label} · ${getBoardDisplayLabel(settings)}`;
 
   ctx.fillStyle = "rgba(255,255,255,0.78)";
   ctx.beginPath();

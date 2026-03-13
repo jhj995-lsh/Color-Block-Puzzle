@@ -35,7 +35,6 @@ const stageFrame = document.getElementById("stage-frame");
 const overlay = document.getElementById("overlay");
 const menuScoreValue = document.getElementById("hud-score");
 const menuTimeValue = document.getElementById("hud-time");
-const boardValue = document.getElementById("hud-board");
 const menuAudioButton = document.getElementById("audio-toggle");
 const titleValue = document.getElementById("hud-title");
 const subtitleValue = document.getElementById("hud-subtitle");
@@ -162,11 +161,9 @@ function renderOverlay() {
 }
 
 function renderMenuHud() {
-  const settings = getDisplaySettings();
   const labels = getControlLabels(state);
   menuScoreValue.textContent = String(state.score);
   menuTimeValue.textContent = `${Math.ceil(state.timeLeft)}`;
-  boardValue.textContent = `${settings.board.cols}×${settings.board.rows}`;
   menuAudioButton.textContent = labels.audioLabel;
 }
 

@@ -61,15 +61,15 @@ const BOARD_PRESETS = {
     label: "竖屏盘面",
     stage: {
       width: 402,
-      height: 430,
+      height: 880,
     },
     board: {
-      x: 3,
-      y: 40,
-      cols: 18,
-      rows: 12,
-      cell: 22,
-      radius: 7,
+      x: 12,
+      y: 116,
+      cols: 12,
+      rows: 18,
+      cell: 31.5,
+      radius: 10,
     },
     fillRatio: 0.64,
     minPlayableSpaces: 8,
@@ -110,6 +110,12 @@ function getBoardSettings(presetName) {
   return BOARD_PRESETS[presetName] || BOARD_PRESETS.portrait;
 }
 
+function getBoardDisplayLabel(settings) {
+  const longSide = Math.max(settings.board.cols, settings.board.rows);
+  const shortSide = Math.min(settings.board.cols, settings.board.rows);
+  return `${longSide}×${shortSide}`;
+}
+
 function getStageRatio(presetName) {
   const settings = getBoardSettings(presetName);
   return settings.stage.width / settings.stage.height;
@@ -145,15 +151,20 @@ function fitStageFrame({
 }) {
   const settings = getBoardSettings(presetName);
   const aspect = getStageRatio(presetName);
+  const immersive = chromeMode !== "menu";
   const chromePadding =
     chromeMode === "immersive-portrait"
-      ? { horizontal: 6, top: 10, bottom: 10 }
+      ? { horizontal: 2, top: 0, bottom: 0 }
       : chromeMode === "immersive-landscape"
-        ? { horizontal: 12, top: 8, bottom: 8 }
+        ? { horizontal: 8, top: 0, bottom: 0 }
         : { horizontal: 16, top: 16, bottom: 16 };
   const availableHeight = Math.max(
     1,
-    viewportHeight - safeAreaTop - safeAreaBottom - chromePadding.top - chromePadding.bottom
+    viewportHeight -
+      (immersive ? 0 : safeAreaTop) -
+      (immersive ? 0 : safeAreaBottom) -
+      chromePadding.top -
+      chromePadding.bottom
   );
   const availableWidth = Math.max(1, viewportWidth - chromePadding.horizontal * 2);
   const width = Math.min(settings.stage.width, availableWidth, availableHeight * aspect);
@@ -921,7 +932,7 @@ function drawParticles(ctx, particles) {
 }
 
 function drawBoardBadge(ctx, settings, stage) {
-  const badge = `${settings.label} · ${settings.board.cols}×${settings.board.rows}`;
+  const badge = `${settings.label} · ${getBoardDisplayLabel(settings)}`;
 
   ctx.fillStyle = "rgba(255,255,255,0.78)";
   ctx.beginPath();
@@ -995,7 +1006,7 @@ function getOverlayView(state, settings) {
       <section class="overlay-card overlay-card--start">
         <p class="overlay-eyebrow">${settings.label}</p>
         <h2>${UI_COPY.title}</h2>
-        <p>当前开局会使用 <strong>${settings.board.cols}×${settings.board.rows}</strong> 盘面，局时 <strong>${settings.maxTime}</strong> 秒。</p>
+        <p>当前开局会使用 <strong>${getBoardDisplayLabel(settings)}</strong> 盘面，局时 <strong>${settings.maxTime}</strong> 秒。</p>
         <div class="overlay-actions">
           <button class="overlay-button overlay-button--primary" data-overlay-action="start-game">开始</button>
           <button class="overlay-button" data-overlay-action="open-leaderboard">排行榜</button>
@@ -1072,7 +1083,6 @@ const stageFrame = document.getElementById("stage-frame");
 const overlay = document.getElementById("overlay");
 const menuScoreValue = document.getElementById("hud-score");
 const menuTimeValue = document.getElementById("hud-time");
-const boardValue = document.getElementById("hud-board");
 const menuAudioButton = document.getElementById("audio-toggle");
 const titleValue = document.getElementById("hud-title");
 const subtitleValue = document.getElementById("hud-subtitle");
@@ -1199,11 +1209,9 @@ function renderOverlay() {
 }
 
 function renderMenuHud() {
-  const settings = getDisplaySettings();
   const labels = getControlLabels(state);
   menuScoreValue.textContent = String(state.score);
   menuTimeValue.textContent = `${Math.ceil(state.timeLeft)}`;
-  boardValue.textContent = `${settings.board.cols}×${settings.board.rows}`;
   menuAudioButton.textContent = labels.audioLabel;
 }
 
