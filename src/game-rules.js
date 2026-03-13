@@ -127,14 +127,16 @@ export function spawnBurst(state, x, y, color) {
 }
 
 export function spawnFlyingTile(state, x, y, color) {
+  const life = 1.1;
   state.flyingTiles.push({
     x,
     y,
-    vx: (Math.random() - 0.5) * 140,
-    vy: -60 - Math.random() * 80,
+    vx: (Math.random() - 0.5) * 110,
+    vy: -90 - Math.random() * 70,
     rotation: (Math.random() - 0.5) * 0.7,
     angularVelocity: (Math.random() - 0.5) * 10,
-    life: 0.55,
+    life,
+    maxLife: life,
     color,
   });
 }
@@ -170,7 +172,7 @@ export function updateState(state, dt) {
   for (const tile of state.flyingTiles) {
     tile.x += tile.vx * dt;
     tile.y += tile.vy * dt;
-    tile.vy += 240 * dt;
+    tile.vy += 320 * dt;
     tile.rotation += tile.angularVelocity * dt;
     tile.life -= dt;
   }

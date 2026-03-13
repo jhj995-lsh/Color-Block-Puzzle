@@ -194,8 +194,10 @@ function drawCross(ctx, action) {
 
 function drawFlyingTiles(ctx, flyingTiles) {
   for (const tile of flyingTiles) {
+    const progress = 1 - tile.life / tile.maxLife;
+    const fade = Math.pow(Math.max(0, 1 - progress), 0.35);
     ctx.save();
-    ctx.globalAlpha = Math.max(0, tile.life * 1.7);
+    ctx.globalAlpha = fade;
     ctx.translate(tile.x, tile.y);
     ctx.rotate(tile.rotation);
     ctx.fillStyle = tile.color;
