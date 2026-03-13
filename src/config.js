@@ -1,26 +1,10 @@
-export const STAGE = {
-  width: 660,
-  height: 480,
-};
+export const LEADERBOARD_KEY = "colorblock_top5";
 
-export const BOARD = {
-  x: 43,
-  y: 55,
-  cols: 22,
-  rows: 15,
-  cell: 25,
-};
-
-export const GAME = {
-  maxTime: 120,
-  missPenalty: 10,
-};
-
-export const SPEAKER_HITBOX = {
-  x: 582,
-  y: 434,
-  width: 48,
-  height: 30,
+export const SOUND_PATHS = {
+  button: "./extracted/sounds/251.mp3",
+  success: "./extracted/sounds/293.mp3",
+  gameOver: "./extracted/sounds/204.mp3",
+  start: "./extracted/sounds/197.mp3",
 };
 
 export const COLORS = [
@@ -48,3 +32,18 @@ export const COLORBLIND_COLORS = [
   "#d27d00",
   "#9d52b6",
 ];
+
+export const STATUS_COPY = {
+  explain: "先看一下玩法说明，再开始挑战。",
+  start: "准备就绪，开始一局新的手机盘面。",
+  playing: "点击空白格，连到两个以上同色方块即可得分。",
+  paused: "已暂停，恢复后继续当前棋盘。",
+  leaderboard: "这里会保留本地前五名成绩。",
+  restart: "新一局已生成，保持节奏。",
+  miss: "此处无法连成同色块，时间会减少 10 秒。",
+};
+
+export const UI_COPY = {
+  title: "彩色消方块",
+  subtitle: "怀旧配色，手机重排",
+};

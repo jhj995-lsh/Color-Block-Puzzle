@@ -1,4 +1,4 @@
-import { SOUND_PATHS } from "./assets.js";
+import { SOUND_PATHS } from "./config.js";
 
 export function createAudioController() {
   const clips = new Map();
@@ -25,7 +25,7 @@ export function createAudioController() {
       audio.currentTime = 0;
       audio.play().catch(() => {});
     } catch {
-      // Ignore browser autoplay edge cases until the next user gesture.
+      // Ignore autoplay restrictions until the next gesture.
     }
   }
 
@@ -37,6 +37,8 @@ export function createAudioController() {
   return {
     play,
     toggle,
-    isEnabled: () => enabled,
+    isEnabled() {
+      return enabled;
+    },
   };
 }

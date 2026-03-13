@@ -1,10 +1,21 @@
-import { BOARD, COLORS, COLORBLIND_COLORS, GAME } from "./config.js";
+import {
+  COLORS,
+  COLORBLIND_COLORS,
+  LEADERBOARD_KEY,
+  STATUS_COPY,
+} from "./config.js";
+import { getBoardSettings, getDefaultBoardPreset } from "./layout.js";
 
-export function createInitialState() {
+export function createInitialState(layoutMode) {
+  const boardPreset = getDefaultBoardPreset(layoutMode);
+
   return {
-    screen: "explain",
+    layoutMode,
+    boardPreset,
+    overlayScreen: "explain",
+    prevOverlayScreen: "start",
     score: 0,
-    timeLeft: GAME.maxTime,
+    timeLeft: getBoardSettings(boardPreset).maxTime,
     running: false,
     paused: false,
     gameOver: false,
@@ -12,20 +23,117 @@ export function createInitialState() {
     flash: 0,
     lastAction: null,
     audioEnabled: true,
+    statusMessage: STATUS_COPY.explain,
     grid: [],
     particles: [],
     flyingTiles: [],
+    leaderboard: loadLeaderboard(),
   };
+}
+
+function getStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function loadLeaderboard() {
+  const storage = getStorage();
+  if (!storage) {
+    return [];
+  }
+  try {
+    const raw = storage.getItem(LEADERBOARD_KEY);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.slice(0, 5);
+    }
+  } catch {
+    // Ignore storage errors and start with an empty board.
+  }
+  return [];
+}
+
+export function saveLeaderboard(entries) {
+  const storage = getStorage();
+  if (!storage) {
+    return;
+  }
+  try {
+    storage.setItem(LEADERBOARD_KEY, JSON.stringify(entries));
+  } catch {
+    // Ignore storage errors; the game remains playable without persistence.
+  }
 }
 
 export function paletteFor(state) {
   return state.colorblind ? COLORBLIND_COLORS : COLORS;
 }
 
+export function getActiveBoardSettings(state) {
+  return getBoardSettings(state.boardPreset);
+}
+
+export function getDisplayBoardSettings(state) {
+  if (state.running || state.gameOver) {
+    return getActiveBoardSettings(state);
+  }
+  return getBoardSettings(getDefaultBoardPreset(state.layoutMode));
+}
+
+export function setStatusMessage(state, message) {
+  state.statusMessage = message;
+}
+
+export function syncLayoutMode(state, layoutMode) {
+  state.layoutMode = layoutMode;
+  if (!state.running && !state.gameOver) {
+    state.boardPreset = getDefaultBoardPreset(layoutMode);
+    state.timeLeft = getBoardSettings(state.boardPreset).maxTime;
+  }
+}
+
+export function dismissExplain(state) {
+  state.overlayScreen = "start";
+  setStatusMessage(state, STATUS_COPY.start);
+}
+
+export function openLeaderboard(state) {
+  state.prevOverlayScreen = state.overlayScreen || "start";
+  state.overlayScreen = "leaderboard";
+  setStatusMessage(state, STATUS_COPY.leaderboard);
+}
+
+export function closeLeaderboard(state) {
+  state.overlayScreen = state.prevOverlayScreen || "start";
+  setStatusMessage(state, state.overlayScreen === "gameover" ? `本局得分 ${state.score}` : STATUS_COPY.start);
+}
+
+export function togglePause(state) {
+  if (!state.running || state.gameOver) {
+    return false;
+  }
+  state.paused = !state.paused;
+  setStatusMessage(state, state.paused ? STATUS_COPY.paused : STATUS_COPY.playing);
+  return state.paused;
+}
+
+export function toggleColorblind(state) {
+  state.colorblind = !state.colorblind;
+  setStatusMessage(state, state.colorblind ? "色弱模式已开启。" : "色弱模式已关闭。");
+  return state.colorblind;
+}
+
 export function restartGame(state) {
-  state.screen = "play";
+  const nextPreset = getDefaultBoardPreset(state.layoutMode);
+  const settings = getBoardSettings(nextPreset);
+
+  state.boardPreset = nextPreset;
+  state.overlayScreen = null;
   state.score = 0;
-  state.timeLeft = GAME.maxTime;
+  state.timeLeft = settings.maxTime;
   state.running = true;
   state.paused = false;
   state.gameOver = false;
@@ -33,46 +141,8 @@ export function restartGame(state) {
   state.lastAction = null;
   state.particles = [];
   state.flyingTiles = [];
+  setStatusMessage(state, STATUS_COPY.playing);
   makeGrid(state);
-}
-
-function countPlayableSpaces(state) {
-  let count = 0;
-  for (let row = 0; row < BOARD.rows; row += 1) {
-    for (let col = 0; col < BOARD.cols; col += 1) {
-      if (state.grid[row][col] !== null) {
-        continue;
-      }
-      const targets = findTargets(state, row, col);
-      const groups = new Map();
-      for (const target of targets) {
-        groups.set(target.color, (groups.get(target.color) || 0) + 1);
-      }
-      for (const size of groups.values()) {
-        if (size >= 2) {
-          count += 1;
-          break;
-        }
-      }
-    }
-  }
-  return count;
-}
-
-export function makeGrid(state) {
-  const palette = paletteFor(state);
-  let attempts = 0;
-  do {
-    state.grid = [];
-    for (let row = 0; row < BOARD.rows; row += 1) {
-      const line = [];
-      for (let col = 0; col < BOARD.cols; col += 1) {
-        line.push(Math.random() < 0.56 ? Math.floor(Math.random() * palette.length) : null);
-      }
-      state.grid.push(line);
-    }
-    attempts += 1;
-  } while (countPlayableSpaces(state) < 12 && attempts < 50);
 }
 
 export function countBlocks(state) {
@@ -87,7 +157,54 @@ export function countBlocks(state) {
   return count;
 }
 
+export function countPlayableSpaces(state) {
+  const settings = getActiveBoardSettings(state);
+  let count = 0;
+
+  for (let row = 0; row < settings.board.rows; row += 1) {
+    for (let col = 0; col < settings.board.cols; col += 1) {
+      if (state.grid[row][col] !== null) {
+        continue;
+      }
+
+      const targets = findTargets(state, row, col);
+      const groups = new Map();
+      for (const target of targets) {
+        groups.set(target.color, (groups.get(target.color) || 0) + 1);
+      }
+
+      for (const size of groups.values()) {
+        if (size >= 2) {
+          count += 1;
+          break;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
+export function makeGrid(state) {
+  const settings = getActiveBoardSettings(state);
+  const palette = paletteFor(state);
+  let attempts = 0;
+
+  do {
+    state.grid = [];
+    for (let row = 0; row < settings.board.rows; row += 1) {
+      const line = [];
+      for (let col = 0; col < settings.board.cols; col += 1) {
+        line.push(Math.random() < settings.fillRatio ? Math.floor(Math.random() * palette.length) : null);
+      }
+      state.grid.push(line);
+    }
+    attempts += 1;
+  } while (countPlayableSpaces(state) < settings.minPlayableSpaces && attempts < 50);
+}
+
 export function findTargets(state, row, col) {
+  const settings = getActiveBoardSettings(state);
   const targets = [];
   const dirs = [
     [-1, 0, "up"],
@@ -97,44 +214,54 @@ export function findTargets(state, row, col) {
   ];
 
   for (const [dr, dc, dir] of dirs) {
-    let r = row + dr;
-    let c = col + dc;
-    while (r >= 0 && r < BOARD.rows && c >= 0 && c < BOARD.cols) {
-      if (state.grid[r][c] !== null) {
-        targets.push({ row: r, col: c, color: state.grid[r][c], dir });
+    let nextRow = row + dr;
+    let nextCol = col + dc;
+    while (
+      nextRow >= 0 &&
+      nextRow < settings.board.rows &&
+      nextCol >= 0 &&
+      nextCol < settings.board.cols
+    ) {
+      if (state.grid[nextRow][nextCol] !== null) {
+        targets.push({
+          row: nextRow,
+          col: nextCol,
+          color: state.grid[nextRow][nextCol],
+          dir,
+        });
         break;
       }
-      r += dr;
-      c += dc;
+      nextRow += dr;
+      nextCol += dc;
     }
   }
 
   return targets;
 }
 
-export function spawnBurst(state, x, y, color) {
-  for (let i = 0; i < 8; i += 1) {
-    const angle = (Math.PI * 2 * i) / 8;
+function spawnBurst(state, x, y, color) {
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (Math.PI * 2 * index) / 8;
     state.particles.push({
       x,
       y,
-      vx: Math.cos(angle) * (36 + Math.random() * 28),
-      vy: Math.sin(angle) * (36 + Math.random() * 28),
-      life: 0.4,
+      vx: Math.cos(angle) * (150 + Math.random() * 50),
+      vy: Math.sin(angle) * (150 + Math.random() * 50),
+      life: 0.6,
       color,
     });
   }
 }
 
-export function spawnFlyingTile(state, x, y, color) {
+function spawnFlyingTile(state, x, y, color) {
   state.flyingTiles.push({
     x,
     y,
-    vx: (Math.random() - 0.5) * 140,
-    vy: -60 - Math.random() * 80,
+    vx: (Math.random() - 0.5) * 350,
+    vy: -300 - Math.random() * 200,
     rotation: (Math.random() - 0.5) * 0.7,
-    angularVelocity: (Math.random() - 0.5) * 10,
-    life: 0.55,
+    angularVelocity: (Math.random() - 0.5) * 15,
+    life: 1,
     color,
   });
 }
@@ -142,7 +269,18 @@ export function spawnFlyingTile(state, x, y, color) {
 export function endGame(state) {
   state.running = false;
   state.gameOver = true;
-  state.screen = "gameover";
+  state.paused = false;
+  state.overlayScreen = "gameover";
+  setStatusMessage(state, `本局结束，得分 ${state.score}`);
+
+  if (state.score > 0) {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    state.leaderboard.push({ score: state.score, date });
+    state.leaderboard.sort((left, right) => right.score - left.score);
+    state.leaderboard = state.leaderboard.slice(0, 5);
+    saveLeaderboard(state.leaderboard);
+  }
 }
 
 export function updateState(state, dt) {
@@ -170,21 +308,27 @@ export function updateState(state, dt) {
   for (const tile of state.flyingTiles) {
     tile.x += tile.vx * dt;
     tile.y += tile.vy * dt;
-    tile.vy += 240 * dt;
+    tile.vy += 1500 * dt;
     tile.rotation += tile.angularVelocity * dt;
     tile.life -= dt;
   }
 }
 
 export function performClick(state, row, col) {
+  const settings = getActiveBoardSettings(state);
+
+  if (row < 0 || row >= settings.board.rows || col < 0 || col >= settings.board.cols) {
+    return { type: "out-of-bounds" };
+  }
+
   if (state.grid[row][col] !== null) {
     state.lastAction = null;
-    return { type: "occupied", picked: [] };
+    setStatusMessage(state, "这里已经有方块了，请点击空白格。");
+    return { type: "occupied" };
   }
 
   const targets = findTargets(state, row, col);
   const groups = new Map();
-
   for (const target of targets) {
     if (!groups.has(target.color)) {
       groups.set(target.color, []);
@@ -209,8 +353,8 @@ export function performClick(state, row, col) {
 
   if (picked.length >= 2) {
     for (const item of picked) {
-      const x = BOARD.x + item.col * BOARD.cell + BOARD.cell / 2;
-      const y = BOARD.y + item.row * BOARD.cell + BOARD.cell / 2;
+      const x = settings.board.x + item.col * settings.board.cell + settings.board.cell / 2;
+      const y = settings.board.y + item.row * settings.board.cell + settings.board.cell / 2;
       const color = paletteFor(state)[item.color];
       spawnBurst(state, x, y, color);
       spawnFlyingTile(state, x, y, color);
@@ -218,6 +362,7 @@ export function performClick(state, row, col) {
     }
 
     state.score += picked.length;
+    setStatusMessage(state, `成功消除了 ${picked.length} 个方块。`);
 
     if (countBlocks(state) === 0) {
       endGame(state);
@@ -226,8 +371,10 @@ export function performClick(state, row, col) {
     return { type: "success", picked };
   }
 
-  state.timeLeft = Math.max(0, state.timeLeft - GAME.missPenalty);
+  state.timeLeft = Math.max(0, state.timeLeft - settings.missPenalty);
   state.flash = 0.22;
+  setStatusMessage(state, STATUS_COPY.miss);
+
   if (state.timeLeft <= 0) {
     endGame(state);
   }
@@ -235,22 +382,43 @@ export function performClick(state, row, col) {
   return { type: "miss", picked: [] };
 }
 
+export function getControlLabels(state) {
+  return {
+    pauseLabel: state.paused ? "继续" : "暂停",
+    colorblindLabel: state.colorblind ? "色弱已开" : "色弱模式",
+    restartLabel: "重新开始",
+    audioLabel: state.audioEnabled ? "声音 开" : "声音 关",
+  };
+}
+
 export function renderStateToText(state) {
+  const settings = getDisplayBoardSettings(state);
+
   return JSON.stringify({
     coordinateSystem: {
       origin: "top-left",
       x: "right",
       y: "down",
     },
-    screen: state.screen,
+    layoutMode: state.layoutMode,
+    boardPreset: state.boardPreset,
+    overlayScreen: state.overlayScreen,
     score: state.score,
     timeLeft: Number(state.timeLeft.toFixed(2)),
     running: state.running,
     paused: state.paused,
     gameOver: state.gameOver,
     audioEnabled: state.audioEnabled,
+    colorblind: state.colorblind,
+    statusMessage: state.statusMessage,
     blocks: countBlocks(state),
     lastAction: state.lastAction,
     flyingTiles: state.flyingTiles.length,
+    board: {
+      cols: settings.board.cols,
+      rows: settings.board.rows,
+      cell: settings.board.cell,
+    },
+    controls: getControlLabels(state),
   });
 }

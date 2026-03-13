@@ -1,146 +1,170 @@
-import { BOARD, GAME, SPEAKER_HITBOX } from "./config.js";
-import { paletteFor } from "./game-rules.js";
+import { paletteFor, getDisplayBoardSettings } from "./game-rules.js";
 
-export function renderGame(ctx, assets, state) {
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+export function renderGame(ctx, state) {
+  const settings = getDisplayBoardSettings(state);
+  const { stage, board } = settings;
 
-  if (state.screen === "explain") {
-    drawExplainScreen(ctx, assets);
-    return;
+  ctx.canvas.width = stage.width;
+  ctx.canvas.height = stage.height;
+  ctx.clearRect(0, 0, stage.width, stage.height);
+
+  drawBackdrop(ctx, stage, state.layoutMode);
+  drawBoardPanel(ctx, board, stage);
+  drawGridLines(ctx, board);
+
+  if (state.grid.length > 0) {
+    drawGrid(ctx, state, board);
+  } else {
+    drawIdlePreview(ctx, board);
   }
 
-  if (state.screen === "start") {
-    drawStartScreen(ctx, assets, state.audioEnabled);
-    return;
-  }
-
-  if (state.screen === "gameover") {
-    drawPlayScreen(ctx, assets, state);
-    drawCenterLabel(ctx, `结束 ${state.score}`);
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#8f8f8f";
-    ctx.font = "16px Microsoft YaHei";
-    ctx.fillText("点击画面重新开始", 330, 286);
-    return;
-  }
-
-  drawPlayScreen(ctx, assets, state);
-}
-
-function drawStageFrame(ctx, assets) {
-  if (assets.frame.complete) {
-    ctx.drawImage(assets.frame, 0, 0, ctx.canvas.width, ctx.canvas.height);
-    return;
-  }
-
-  ctx.fillStyle = "#f3f3f3";
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-}
-
-function drawExplainScreen(ctx, assets) {
-  drawStageFrame(ctx, assets);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#62c51d";
-  ctx.font = "bold 34px Microsoft YaHei";
-  ctx.fillText("游戏说明", 330, 96);
-
-  if (assets.tutorial.complete) {
-    ctx.drawImage(assets.tutorial, 184, 128, 292, 214);
-  }
-
-  ctx.fillStyle = "#ff7c7c";
-  ctx.font = "bold 20px Microsoft YaHei";
-  ctx.fillText("十字线能连接到的两个以上相同颜色的方块就能打碎得分！", 330, 392);
-
-  ctx.fillStyle = "#ff7878";
-  ctx.font = "bold 40px Microsoft YaHei";
-  ctx.fillText("开始", 330, 458);
-}
-
-function drawStartScreen(ctx, assets, audioEnabled) {
-  drawStageFrame(ctx, assets);
-  if (assets.title.complete) {
-    ctx.drawImage(assets.title, 20, 20, 620, 420);
-  }
-
-  ctx.fillStyle = "#ffffff";
-  ctx.globalAlpha = 0.92;
-  ctx.fillRect(257, 250, 146, 56);
-  ctx.globalAlpha = 1;
-
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#ff7d7d";
-  ctx.font = "bold 40px Microsoft YaHei";
-  ctx.fillText("开始", 330, 291);
-  drawSpeakerIcon(ctx, audioEnabled);
-}
-
-function drawPlayScreen(ctx, assets, state) {
-  drawStageFrame(ctx, assets);
-  if (assets.board.complete) {
-    ctx.drawImage(assets.board, 20, 20, 620, 420);
-  }
-
-  drawTimeBar(ctx, state.timeLeft);
-  drawScore(ctx, state.score);
-  drawGrid(ctx, state);
-  drawFlyingTiles(ctx, state.flyingTiles);
+  drawFlyingTiles(ctx, state.flyingTiles, board.radius);
   drawParticles(ctx, state.particles);
-  drawSpeakerIcon(ctx, state.audioEnabled);
 
-  if (state.lastAction) {
-    drawCross(ctx, state.lastAction);
+  if (state.lastAction && state.grid.length > 0) {
+    drawCross(ctx, state.lastAction, board);
   }
 
   if (state.flash > 0) {
-    ctx.fillStyle = `rgba(255, 120, 120, ${state.flash * 0.65})`;
-    ctx.fillRect(20, 20, 620, 420);
+    ctx.fillStyle = `rgba(255, 128, 128, ${state.flash * 0.65})`;
+    ctx.beginPath();
+    ctx.roundRect(
+      board.x - 10,
+      board.y - 10,
+      board.cols * board.cell + 20,
+      board.rows * board.cell + 20,
+      24
+    );
+    ctx.fill();
   }
+
+  drawBoardBadge(ctx, settings, stage);
 
   if (state.paused) {
-    drawCenterLabel(ctx, "暂停");
+    drawCenterLabel(ctx, stage, "暂停中");
   }
 }
 
-function drawTimeBar(ctx, timeLeft) {
-  const ratio = Math.max(0, timeLeft / GAME.maxTime);
-  ctx.strokeStyle = "#f6c3c3";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(33, 30, 310, 10);
-  ctx.fillStyle = "#f8c8c8";
-  ctx.fillRect(34, 31, 308 * ratio, 8);
+function drawBackdrop(ctx, stage, layoutMode) {
+  const gradient = ctx.createLinearGradient(0, 0, stage.width, stage.height);
+  gradient.addColorStop(0, layoutMode === "portrait" ? "#fff4ef" : "#fff7e8");
+  gradient.addColorStop(1, layoutMode === "portrait" ? "#f7fbff" : "#f5fff7");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, stage.width, stage.height);
+
+  const bubbles = [
+    { x: stage.width * 0.15, y: stage.height * 0.12, r: 54, color: "rgba(255, 189, 196, 0.26)" },
+    { x: stage.width * 0.85, y: stage.height * 0.18, r: 40, color: "rgba(119, 214, 222, 0.22)" },
+    { x: stage.width * 0.76, y: stage.height * 0.78, r: 62, color: "rgba(203, 112, 232, 0.18)" },
+    { x: stage.width * 0.18, y: stage.height * 0.82, r: 48, color: "rgba(214, 215, 108, 0.22)" },
+  ];
+
+  for (const bubble of bubbles) {
+    ctx.fillStyle = bubble.color;
+    ctx.beginPath();
+    ctx.arc(bubble.x, bubble.y, bubble.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
-function drawScore(ctx, score) {
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#ff7a7a";
-  ctx.font = "bold 26px Arial";
-  ctx.fillText(String(score), 619, 45);
+function drawBoardPanel(ctx, board, stage) {
+  const width = board.cols * board.cell;
+  const height = board.rows * board.cell;
+  const panelX = board.x - 12;
+  const panelY = board.y - 12;
+
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, width + 24, height + 24, 26);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 168, 176, 0.45)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 244, 247, 0.8)";
+  ctx.beginPath();
+  ctx.roundRect(panelX + 8, panelY + 8, width + 8, height + 8, 22);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillRect(0, stage.height - 46, stage.width, 46);
 }
 
-function drawGrid(ctx, state) {
+function drawGridLines(ctx, board) {
+  ctx.strokeStyle = "rgba(255, 191, 196, 0.18)";
+  ctx.lineWidth = 1;
+
+  for (let row = 0; row <= board.rows; row += 1) {
+    const y = board.y + row * board.cell;
+    ctx.beginPath();
+    ctx.moveTo(board.x, y);
+    ctx.lineTo(board.x + board.cols * board.cell, y);
+    ctx.stroke();
+  }
+
+  for (let col = 0; col <= board.cols; col += 1) {
+    const x = board.x + col * board.cell;
+    ctx.beginPath();
+    ctx.moveTo(x, board.y);
+    ctx.lineTo(x, board.y + board.rows * board.cell);
+    ctx.stroke();
+  }
+}
+
+function drawGrid(ctx, state, board) {
   const swatches = paletteFor(state);
-  for (let row = 0; row < BOARD.rows; row += 1) {
-    for (let col = 0; col < BOARD.cols; col += 1) {
+
+  for (let row = 0; row < board.rows; row += 1) {
+    for (let col = 0; col < board.cols; col += 1) {
       const cell = state.grid[row]?.[col];
       if (cell === null || cell === undefined) {
         continue;
       }
-      const x = BOARD.x + col * BOARD.cell;
-      const y = BOARD.y + row * BOARD.cell;
-      drawTile(ctx, x, y, swatches[cell], state.colorblind ? String((cell % 10) + 1) : "");
+      const x = board.x + col * board.cell;
+      const y = board.y + row * board.cell;
+      const label = state.colorblind ? String((cell % 10) + 1) : "";
+      drawTile(ctx, x, y, board.cell, board.radius, swatches[cell], label);
     }
   }
 }
 
-function drawTile(ctx, x, y, color, label) {
-  const gradient = ctx.createLinearGradient(x, y, x, y + BOARD.cell);
+function drawIdlePreview(ctx, board) {
+  const palette = ["#ffdbdf", "#d8f0ff", "#fff3bf", "#dff6df"];
+
+  for (let row = 0; row < board.rows; row += 1) {
+    for (let col = 0; col < board.cols; col += 1) {
+      if ((row + col) % 3 !== 0) {
+        continue;
+      }
+      const x = board.x + col * board.cell;
+      const y = board.y + row * board.cell;
+      drawTile(
+        ctx,
+        x,
+        y,
+        board.cell,
+        board.radius,
+        palette[(row + col) % palette.length],
+        ""
+      );
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.fillRect(x + 4, y + 4, board.cell - 8, board.cell - 8);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+function drawTile(ctx, x, y, cell, radius, color, label) {
+  const gradient = ctx.createLinearGradient(x, y, x, y + cell);
   gradient.addColorStop(0, shade(color, 0.35));
   gradient.addColorStop(0.5, color);
-  gradient.addColorStop(1, shade(color, -0.12));
+  gradient.addColorStop(1, shade(color, -0.16));
+
   ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.roundRect(x + 1.5, y + 1.5, BOARD.cell - 3, BOARD.cell - 3, 5);
+  ctx.roundRect(x + 1.5, y + 1.5, cell - 3, cell - 3, radius);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(255,255,255,0.72)";
@@ -151,56 +175,47 @@ function drawTile(ctx, x, y, color, label) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 12px Arial";
-    ctx.fillText(label, x + BOARD.cell / 2, y + BOARD.cell / 2 + 1);
+    ctx.font = `bold ${Math.max(11, Math.floor(cell * 0.45))}px Arial`;
+    ctx.fillText(label, x + cell / 2, y + cell / 2 + 1);
     ctx.textBaseline = "alphabetic";
   }
 }
 
-function drawCross(ctx, action) {
-  const cx = BOARD.x + action.col * BOARD.cell + BOARD.cell / 2;
-  const cy = BOARD.y + action.row * BOARD.cell + BOARD.cell / 2;
+function drawCross(ctx, action, board) {
+  const centerX = board.x + action.col * board.cell + board.cell / 2;
+  const centerY = board.y + action.row * board.cell + board.cell / 2;
 
   ctx.save();
-  ctx.strokeStyle = action.success ? "rgba(255, 110, 110, 0.85)" : "rgba(120, 120, 120, 0.55)";
+  ctx.strokeStyle = action.success ? "rgba(255, 98, 122, 0.85)" : "rgba(120, 120, 120, 0.5)";
   ctx.lineWidth = 2;
-  ctx.setLineDash([4, 4]);
+  ctx.setLineDash([5, 4]);
+
   for (const target of action.targets) {
-    const tx = BOARD.x + target.col * BOARD.cell + BOARD.cell / 2;
-    const ty = BOARD.y + target.row * BOARD.cell + BOARD.cell / 2;
+    const targetX = board.x + target.col * board.cell + board.cell / 2;
+    const targetY = board.y + target.row * board.cell + board.cell / 2;
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(tx, ty);
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(targetX, targetY);
     ctx.stroke();
   }
-  ctx.setLineDash([]);
 
+  ctx.setLineDash([]);
   ctx.fillStyle = action.success ? "#ff4f6a" : "#a8a8a8";
   ctx.beginPath();
-  ctx.moveTo(cx, cy - 10);
-  ctx.lineTo(cx + 3, cy - 3);
-  ctx.lineTo(cx + 10, cy - 3);
-  ctx.lineTo(cx + 5, cy + 2);
-  ctx.lineTo(cx + 7, cy + 10);
-  ctx.lineTo(cx, cy + 5);
-  ctx.lineTo(cx - 7, cy + 10);
-  ctx.lineTo(cx - 5, cy + 2);
-  ctx.lineTo(cx - 10, cy - 3);
-  ctx.lineTo(cx - 3, cy - 3);
-  ctx.closePath();
+  ctx.arc(centerX, centerY, Math.max(5, board.cell * 0.25), 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
-function drawFlyingTiles(ctx, flyingTiles) {
+function drawFlyingTiles(ctx, flyingTiles, radius) {
   for (const tile of flyingTiles) {
     ctx.save();
-    ctx.globalAlpha = Math.max(0, tile.life * 1.7);
+    ctx.globalAlpha = Math.max(0, Math.min(1, tile.life * 1.5));
     ctx.translate(tile.x, tile.y);
     ctx.rotate(tile.rotation);
     ctx.fillStyle = tile.color;
     ctx.beginPath();
-    ctx.roundRect(-11, -11, 22, 22, 4);
+    ctx.roundRect(-11, -11, 22, 22, Math.max(3, radius - 2));
     ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.6)";
     ctx.lineWidth = 1;
@@ -223,44 +238,35 @@ function drawParticles(ctx, particles) {
   ctx.globalAlpha = 1;
 }
 
-function drawSpeakerIcon(ctx, audioEnabled) {
-  ctx.save();
-  ctx.translate(604, 454);
-  ctx.strokeStyle = audioEnabled ? "#6fa66f" : "#b0b0b0";
-  ctx.lineWidth = 3;
+function drawBoardBadge(ctx, settings, stage) {
+  const badge = `${settings.label} · ${settings.board.cols}×${settings.board.rows}`;
+
+  ctx.fillStyle = "rgba(255,255,255,0.78)";
   ctx.beginPath();
-  ctx.moveTo(-16, -2);
-  ctx.lineTo(-8, -2);
-  ctx.lineTo(-2, -8);
-  ctx.lineTo(-2, 8);
-  ctx.lineTo(-8, 2);
-  ctx.lineTo(-16, 2);
-  ctx.stroke();
+  ctx.roundRect(16, stage.height - 36, 156, 24, 12);
+  ctx.fill();
 
-  if (audioEnabled) {
-    ctx.beginPath();
-    ctx.arc(2, 0, 8, -0.8, 0.8);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(4, 0, 12, -0.8, 0.8);
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-    ctx.moveTo(-2, -10);
-    ctx.lineTo(10, 10);
-    ctx.stroke();
-  }
-
-  ctx.restore();
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#b8848d";
+  ctx.font = "bold 12px 'Trebuchet MS', 'Microsoft YaHei', sans-serif";
+  ctx.fillText(badge, 28, stage.height - 20);
 }
 
-function drawCenterLabel(ctx, text) {
+function drawCenterLabel(ctx, stage, text) {
+  const width = 180;
+  const height = 72;
+  const x = stage.width / 2 - width / 2;
+  const y = stage.height / 2 - height / 2;
+
   ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.fillRect(240, 198, 180, 68);
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 20);
+  ctx.fill();
+
   ctx.textAlign = "center";
   ctx.fillStyle = "#ff7a7a";
-  ctx.font = "bold 32px Microsoft YaHei";
-  ctx.fillText(text, 330, 243);
+  ctx.font = "bold 30px 'Trebuchet MS', 'Microsoft YaHei', sans-serif";
+  ctx.fillText(text, stage.width / 2, y + 45);
 }
 
 function shade(hex, amount) {
@@ -270,13 +276,4 @@ function shade(hex, amount) {
   const g = clamp(((num >> 8) & 255) + 255 * amount);
   const b = clamp((num & 255) + 255 * amount);
   return `rgb(${r}, ${g}, ${b})`;
-}
-
-export function isSpeakerHit(x, y) {
-  return (
-    x >= SPEAKER_HITBOX.x &&
-    x <= SPEAKER_HITBOX.x + SPEAKER_HITBOX.width &&
-    y >= SPEAKER_HITBOX.y &&
-    y <= SPEAKER_HITBOX.y + SPEAKER_HITBOX.height
-  );
 }
