@@ -33,17 +33,33 @@
     <section class="stage-shell">
       <div id="stage-frame" class="stage-frame">
         <canvas id="game" aria-label="彩色消方块"></canvas>
+        <div id="game-hud" class="game-hud" hidden>
+          <div class="game-hud-pill">
+            <span>分数</span>
+            <strong id="game-score">0</strong>
+          </div>
+          <div class="game-hud-pill">
+            <span>时间</span>
+            <strong id="game-time">0</strong>
+          </div>
+        </div>
+        <button id="game-audio-toggle" class="game-audio" type="button" aria-label="声音 开" hidden>音</button>
+        <p id="status-toast" class="status-toast" hidden></p>
+        <div id="game-actions" class="game-actions" hidden>
+          <button id="pause-fab" class="control-fab" type="button" data-control="pause">暂停</button>
+          <button id="more-fab" class="control-fab control-fab--secondary" type="button" data-control="more">更多</button>
+        </div>
+        <section id="controls-sheet" class="controls-sheet" hidden>
+          <p class="controls-sheet-title">更多操作</p>
+          <div class="controls-sheet-actions">
+            <button id="sheet-colorblind" class="sheet-button" type="button" data-control="colorblind">色弱模式</button>
+            <button id="sheet-restart" class="sheet-button" type="button" data-control="restart">重新开始</button>
+            <button id="sheet-leaderboard" class="sheet-button" type="button" data-control="leaderboard">排行榜</button>
+          </div>
+        </section>
         <div id="overlay" class="overlay-layer"></div>
       </div>
     </section>
-
-    <p id="status-bar" class="status-bar"></p>
-
-    <nav id="controls" class="bottom-controls">
-      <button type="button" class="control-button" data-control="pause">暂停</button>
-      <button type="button" class="control-button" data-control="colorblind">色弱模式</button>
-      <button type="button" class="control-button control-button--accent" data-control="restart">重新开始</button>
-    </nav>
   </main>
 
   <script>

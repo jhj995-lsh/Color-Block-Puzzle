@@ -6,6 +6,7 @@ import {
   fitStageFrame,
   getBoardSettings,
   getDefaultBoardPreset,
+  getViewportProfile,
   resolveLayoutMode,
 } from "../src/layout.js";
 
@@ -46,59 +47,56 @@ test("board preset registry exposes both portrait and landscape entries", () => 
   assert.deepEqual(Object.keys(BOARD_PRESETS).sort(), ["landscape", "portrait"]);
 });
 
-test("fitStageFrame keeps the portrait stage within the available viewport", () => {
-  const frame = fitStageFrame({
-    presetName: "portrait",
-    viewportHeight: 852,
-    stageShellWidth: 361,
-    shellPaddingTop: 32,
-    shellPaddingBottom: 24,
-    shellGap: 12,
-    topHeight: 140,
-    statusHeight: 48,
-    controlsHeight: 48,
-    controlsVisible: true,
-  });
-
-  assert.equal(frame.width <= 361, true);
-  assert.equal(frame.height <= 852, true);
-  assert.equal(frame.width / frame.height > 0.7, true);
-  assert.equal(frame.width / frame.height < 0.73, true);
+test("getViewportProfile recognizes the iPhone 17 standard portrait viewport", () => {
+  assert.equal(getViewportProfile(402, 874), "iphone17-standard-portrait");
 });
 
-test("fitStageFrame keeps portrait boards readable on tall phones with stacked controls", () => {
-  const frame = fitStageFrame({
-    presetName: "portrait",
-    viewportHeight: 852,
-    stageShellWidth: 361,
-    shellPaddingTop: 32,
-    shellPaddingBottom: 24,
-    shellGap: 12,
-    topHeight: 332,
-    statusHeight: 64,
-    controlsHeight: 182,
-    controlsVisible: true,
-  });
-
-  assert.equal(frame.width >= 320, true);
-  assert.equal(frame.width <= 361, true);
+test("getViewportProfile recognizes the iPhone 17 standard landscape viewport", () => {
+  assert.equal(getViewportProfile(874, 402), "iphone17-standard-landscape");
 });
 
-test("fitStageFrame shrinks the landscape stage when vertical space is limited", () => {
+test("getViewportProfile falls back to generic mobile outside the target baseline", () => {
+  assert.equal(getViewportProfile(390, 844), "generic-mobile");
+});
+
+test("fitStageFrame keeps the portrait menu stage within the available viewport", () => {
+  const frame = fitStageFrame({
+    presetName: "portrait",
+    viewportWidth: 402,
+    viewportHeight: 874,
+    safeAreaTop: 54,
+    safeAreaBottom: 34,
+    chromeMode: "menu",
+  });
+
+  assert.equal(frame.width <= 402, true);
+  assert.equal(frame.height <= 874, true);
+});
+
+test("fitStageFrame gives the immersive portrait stage near full width on iPhone 17", () => {
+  const frame = fitStageFrame({
+    presetName: "portrait",
+    viewportWidth: 402,
+    viewportHeight: 874,
+    safeAreaTop: 54,
+    safeAreaBottom: 34,
+    chromeMode: "immersive-portrait",
+  });
+
+  assert.equal(frame.width >= 378, true);
+  assert.equal(frame.width <= 402, true);
+});
+
+test("fitStageFrame keeps the immersive landscape stage visible on iPhone 17", () => {
   const frame = fitStageFrame({
     presetName: "landscape",
-    viewportHeight: 393,
-    stageShellWidth: 820,
-    shellPaddingTop: 12,
-    shellPaddingBottom: 12,
-    shellGap: 10,
-    topHeight: 96,
-    statusHeight: 48,
-    controlsHeight: 48,
-    controlsVisible: true,
+    viewportWidth: 874,
+    viewportHeight: 402,
+    safeAreaTop: 0,
+    safeAreaBottom: 21,
+    chromeMode: "immersive-landscape",
   });
 
-  assert.equal(frame.width < BOARD_PRESETS.landscape.stage.width, true);
-  assert.equal(frame.height < BOARD_PRESETS.landscape.stage.height, true);
-  assert.equal(frame.height <= 393, true);
+  assert.equal(frame.width >= 780, true);
+  assert.equal(frame.height <= 402, true);
 });

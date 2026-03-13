@@ -9,7 +9,7 @@ export function renderGame(ctx, state) {
   ctx.clearRect(0, 0, stage.width, stage.height);
 
   drawBackdrop(ctx, stage, state.layoutMode);
-  drawBoardPanel(ctx, board, stage);
+  drawBoardPanel(ctx, board);
   drawGridLines(ctx, board);
 
   if (state.grid.length > 0) {
@@ -38,7 +38,9 @@ export function renderGame(ctx, state) {
     ctx.fill();
   }
 
-  drawBoardBadge(ctx, settings, stage);
+  if (state.chromeMode === "menu") {
+    drawBoardBadge(ctx, settings, stage);
+  }
 
   if (state.paused) {
     drawCenterLabel(ctx, stage, "暂停中");
@@ -67,7 +69,7 @@ function drawBackdrop(ctx, stage, layoutMode) {
   }
 }
 
-function drawBoardPanel(ctx, board, stage) {
+function drawBoardPanel(ctx, board) {
   const width = board.cols * board.cell;
   const height = board.rows * board.cell;
   const panelX = board.x - 12;
@@ -86,9 +88,6 @@ function drawBoardPanel(ctx, board, stage) {
   ctx.beginPath();
   ctx.roundRect(panelX + 8, panelY + 8, width + 8, height + 8, 22);
   ctx.fill();
-
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.fillRect(0, stage.height - 46, stage.width, 46);
 }
 
 function drawGridLines(ctx, board) {

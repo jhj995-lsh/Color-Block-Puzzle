@@ -13,6 +13,7 @@ import {
   setStatusMessage,
   syncLayoutMode,
   toggleColorblind,
+  toggleControlsSheet,
   togglePause,
   updateState,
 } from "./game-rules.js";
@@ -20,6 +21,7 @@ import {
   fitStageFrame,
   getDefaultBoardPreset,
   getStageRatio,
+  getViewportProfile,
   resolveLayoutMode,
 } from "./layout.js";
 import { getOverlayView, shouldReplaceOverlay } from "./overlay-view.js";
@@ -29,28 +31,65 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const appShell = document.getElementById("app-shell");
 const topHud = document.querySelector(".top-hud");
-const stageShell = document.querySelector(".stage-shell");
 const stageFrame = document.getElementById("stage-frame");
 const overlay = document.getElementById("overlay");
-const statusBar = document.getElementById("status-bar");
-const controls = document.getElementById("controls");
-const scoreValue = document.getElementById("hud-score");
-const timeValue = document.getElementById("hud-time");
+const menuScoreValue = document.getElementById("hud-score");
+const menuTimeValue = document.getElementById("hud-time");
 const boardValue = document.getElementById("hud-board");
-const audioButton = document.getElementById("audio-toggle");
+const menuAudioButton = document.getElementById("audio-toggle");
 const titleValue = document.getElementById("hud-title");
 const subtitleValue = document.getElementById("hud-subtitle");
+const gameHud = document.getElementById("game-hud");
+const gameScoreValue = document.getElementById("game-score");
+const gameTimeValue = document.getElementById("game-time");
+const gameAudioButton = document.getElementById("game-audio-toggle");
+const statusToast = document.getElementById("status-toast");
+const gameActions = document.getElementById("game-actions");
+const pauseFab = document.getElementById("pause-fab");
+const moreFab = document.getElementById("more-fab");
+const controlsSheet = document.getElementById("controls-sheet");
+const colorblindButton = document.getElementById("sheet-colorblind");
+const restartButton = document.getElementById("sheet-restart");
+const leaderboardButton = document.getElementById("sheet-leaderboard");
 
 const audio = createAudioController();
-const state = createInitialState(resolveLayoutMode(window.innerWidth, window.innerHeight));
+const initialViewport = getViewportMetrics();
+const state = createInitialState(initialViewport.layoutMode, initialViewport.viewportProfile);
 
 let lastFrameTime = 0;
 let gameOverSoundPlayed = false;
-let shellLayoutKey = "";
 let previousOverlayView = null;
 
 titleValue.textContent = UI_COPY.title;
 subtitleValue.textContent = UI_COPY.subtitle;
+
+function readViewportDimension(key, fallback) {
+  const viewport = window.visualViewport;
+  if (!viewport || typeof viewport[key] !== "number") {
+    return fallback;
+  }
+  return Math.round(viewport[key]);
+}
+
+function readSafeAreaInset(name) {
+  const value = parseFloat(
+    window.getComputedStyle(document.documentElement).getPropertyValue(name) || "0"
+  );
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getViewportMetrics() {
+  const width = readViewportDimension("width", window.innerWidth);
+  const height = readViewportDimension("height", window.innerHeight);
+  return {
+    width,
+    height,
+    layoutMode: resolveLayoutMode(width, height),
+    viewportProfile: getViewportProfile(width, height),
+    safeAreaTop: readSafeAreaInset("--safe-area-top"),
+    safeAreaBottom: readSafeAreaInset("--safe-area-bottom"),
+  };
+}
 
 function getDisplaySettings() {
   return getDisplayBoardSettings(state);
@@ -76,66 +115,43 @@ function getBoardCell(clientX, clientY) {
   return { row, col };
 }
 
-function updateLayoutMode() {
-  syncLayoutMode(state, resolveLayoutMode(window.innerWidth, window.innerHeight));
+function updateViewportState() {
+  const viewport = getViewportMetrics();
+  syncLayoutMode(state, viewport.layoutMode, viewport.viewportProfile);
 }
 
 function syncStageFrame() {
-  const preset = state.running || state.gameOver ? state.boardPreset : getDefaultBoardPreset(state.layoutMode);
+  const viewport = getViewportMetrics();
+  const preset =
+    state.running || state.gameOver
+      ? state.boardPreset
+      : getDefaultBoardPreset(state.layoutMode);
   const settings = getDisplaySettings();
   const aspect = getStageRatio(preset);
-  stageFrame.style.setProperty("--stage-aspect", `${aspect}`);
-  stageFrame.style.setProperty("--stage-max-width", `${settings.stage.width}px`);
-  appShell.dataset.layoutMode = state.layoutMode;
-
-  const controlsVisible = !controls.hidden;
-  const shellStyles = window.getComputedStyle(appShell);
-  const shellGap = parseFloat(shellStyles.rowGap || shellStyles.gap || "12");
-  const shellPaddingTop = parseFloat(shellStyles.paddingTop || "0");
-  const shellPaddingBottom = parseFloat(shellStyles.paddingBottom || "0");
-  const topHeight = topHud.getBoundingClientRect().height;
-  const statusHeight = statusBar.getBoundingClientRect().height;
-  const controlsHeight = controlsVisible ? controls.getBoundingClientRect().height : 0;
-  const stageShellWidth = stageShell.getBoundingClientRect().width;
-  const layoutKey = [
-    preset,
-    state.layoutMode,
-    window.innerWidth,
-    window.innerHeight,
-    controlsVisible,
-    Math.round(topHeight),
-    Math.round(statusHeight),
-    Math.round(controlsHeight),
-    Math.round(stageShellWidth),
-  ].join("|");
-
-  if (layoutKey === shellLayoutKey) {
-    return;
-  }
-  shellLayoutKey = layoutKey;
-
   const frameSize = fitStageFrame({
     presetName: preset,
-    viewportHeight: window.innerHeight,
-    stageShellWidth,
-    shellPaddingTop,
-    shellPaddingBottom,
-    shellGap,
-    topHeight,
-    statusHeight,
-    controlsHeight,
-    controlsVisible,
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    safeAreaTop: viewport.safeAreaTop,
+    safeAreaBottom: viewport.safeAreaBottom,
+    chromeMode: state.chromeMode,
   });
 
+  stageFrame.style.setProperty("--stage-aspect", `${aspect}`);
   stageFrame.style.width = `${frameSize.width}px`;
   stageFrame.style.height = `${frameSize.height}px`;
+  stageFrame.style.setProperty("--stage-max-width", `${settings.stage.width}px`);
+
+  appShell.dataset.layoutMode = state.layoutMode;
+  appShell.dataset.chromeMode = state.chromeMode;
+  appShell.dataset.overlayScreen = state.overlayScreen || "play";
+  appShell.dataset.viewportProfile = state.viewportProfile;
 }
 
 function renderOverlay() {
   const settings = getDisplaySettings();
   const nextView = getOverlayView(state, settings);
 
-  appShell.dataset.overlayScreen = nextView.screen;
   overlay.hidden = nextView.hidden;
 
   if (shouldReplaceOverlay(previousOverlayView, nextView)) {
@@ -145,36 +161,44 @@ function renderOverlay() {
   previousOverlayView = nextView;
 }
 
-function renderHud() {
+function renderMenuHud() {
   const settings = getDisplaySettings();
   const labels = getControlLabels(state);
-  scoreValue.textContent = String(state.score);
-  timeValue.textContent = `${Math.ceil(state.timeLeft)}`;
+  menuScoreValue.textContent = String(state.score);
+  menuTimeValue.textContent = `${Math.ceil(state.timeLeft)}`;
   boardValue.textContent = `${settings.board.cols}×${settings.board.rows}`;
-  audioButton.textContent = labels.audioLabel;
+  menuAudioButton.textContent = labels.audioLabel;
 }
 
-function renderControls() {
+function renderGameChrome() {
   const labels = getControlLabels(state);
-  const hidden = Boolean(state.overlayScreen);
+  const immersive = state.chromeMode !== "menu";
 
-  controls.hidden = hidden;
-  if (hidden) {
-    return;
-  }
+  topHud.hidden = !state.overlayScreen && immersive;
+  gameHud.hidden = !immersive;
+  gameAudioButton.hidden = !immersive;
+  gameActions.hidden = !immersive;
+  controlsSheet.hidden = !immersive || !state.controlsSheetOpen;
+  statusToast.hidden = !immersive || !state.running;
 
-  controls.querySelector('[data-control="pause"]').textContent = labels.pauseLabel;
-  controls.querySelector('[data-control="colorblind"]').textContent = labels.colorblindLabel;
-  controls.querySelector('[data-control="restart"]').textContent = labels.restartLabel;
+  gameScoreValue.textContent = String(state.score);
+  gameTimeValue.textContent = `${Math.ceil(state.timeLeft)}`;
+  gameAudioButton.textContent = labels.compactAudioLabel;
+  gameAudioButton.setAttribute("aria-label", labels.audioLabel);
+  pauseFab.textContent = labels.pauseLabel;
+  moreFab.textContent = labels.moreLabel;
+  colorblindButton.textContent = labels.colorblindLabel;
+  restartButton.textContent = labels.restartLabel;
+  leaderboardButton.textContent = "排行榜";
 }
 
 function renderStatus() {
-  statusBar.textContent = state.statusMessage;
+  statusToast.textContent = state.statusMessage;
 }
 
 function renderApp() {
-  renderHud();
-  renderControls();
+  renderMenuHud();
+  renderGameChrome();
   renderStatus();
   renderOverlay();
   syncStageFrame();
@@ -216,23 +240,33 @@ function handleOverlayAction(action) {
 
 function handleControlAction(action) {
   if (action === "pause") {
-    if (togglePause(state)) {
-      playAudio("button");
-    } else if (state.running && !state.gameOver) {
-      playAudio("button");
-    }
+    togglePause(state);
+    state.controlsSheetOpen = false;
+    playAudio("button");
   } else if (action === "colorblind") {
     toggleColorblind(state);
     playAudio("button");
   } else if (action === "restart") {
     startRound("start");
     return;
+  } else if (action === "leaderboard") {
+    openLeaderboard(state);
+    playAudio("button");
+  } else if (action === "more") {
+    toggleControlsSheet(state);
+    playAudio("button");
   }
 
   renderApp();
 }
 
 function handleCanvasPress(event) {
+  if (state.controlsSheetOpen) {
+    state.controlsSheetOpen = false;
+    renderApp();
+    return;
+  }
+
   if (state.overlayScreen || !state.running || state.paused || state.gameOver) {
     return;
   }
@@ -289,6 +323,12 @@ function toggleFullscreen() {
   document.exitFullscreen?.().catch(() => {});
 }
 
+function toggleAudio() {
+  state.audioEnabled = audio.toggle();
+  setStatusMessage(state, state.audioEnabled ? "声音已开启。" : "声音已关闭。");
+  renderApp();
+}
+
 window.render_game_to_text = () => renderStateToText(state);
 window.advanceTime = (ms) => {
   const frameStep = 1000 / 60;
@@ -302,15 +342,15 @@ window.advanceTime = (ms) => {
   lastFrameTime = performance.now();
 };
 
-window.addEventListener("resize", () => {
-  updateLayoutMode();
+function handleViewportRefresh() {
+  updateViewportState();
   renderApp();
-});
+}
 
-window.addEventListener("orientationchange", () => {
-  updateLayoutMode();
-  renderApp();
-});
+window.addEventListener("resize", handleViewportRefresh);
+window.addEventListener("orientationchange", handleViewportRefresh);
+window.visualViewport?.addEventListener("resize", handleViewportRefresh);
+window.visualViewport?.addEventListener("scroll", handleViewportRefresh);
 
 window.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
@@ -325,6 +365,12 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.code === "Escape" && state.controlsSheetOpen) {
+    state.controlsSheetOpen = false;
+    renderApp();
+    return;
+  }
+
   if (event.code === "KeyP") {
     handleControlAction("pause");
     return;
@@ -332,6 +378,11 @@ window.addEventListener("keydown", (event) => {
 
   if (event.code === "KeyC") {
     handleControlAction("colorblind");
+    return;
+  }
+
+  if (event.code === "KeyM") {
+    handleControlAction("more");
     return;
   }
 
@@ -348,7 +399,7 @@ overlay.addEventListener("click", (event) => {
   handleOverlayAction(button.dataset.overlayAction);
 });
 
-controls.addEventListener("click", (event) => {
+gameActions.addEventListener("click", (event) => {
   const button = event.target.closest("[data-control]");
   if (!button) {
     return;
@@ -356,14 +407,18 @@ controls.addEventListener("click", (event) => {
   handleControlAction(button.dataset.control);
 });
 
-audioButton.addEventListener("click", () => {
-  state.audioEnabled = audio.toggle();
-  setStatusMessage(state, state.audioEnabled ? "声音已开启。" : "声音已关闭。");
-  renderApp();
+controlsSheet.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-control]");
+  if (!button) {
+    return;
+  }
+  handleControlAction(button.dataset.control);
 });
 
+menuAudioButton.addEventListener("click", toggleAudio);
+gameAudioButton.addEventListener("click", toggleAudio);
 canvas.addEventListener("pointerdown", handleCanvasPress);
 
-updateLayoutMode();
+updateViewportState();
 renderApp();
 window.requestAnimationFrame(frame);

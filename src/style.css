@@ -1,5 +1,7 @@
 :root {
   color-scheme: light;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --shell-bg: radial-gradient(circle at top, #fff8ef 0%, #f6f9ff 52%, #eef7f1 100%);
   --panel-bg: rgba(255, 255, 255, 0.78);
   --panel-border: rgba(255, 176, 183, 0.32);
@@ -9,6 +11,7 @@
   --accent-strong: #ff6f86;
   --mint: #78c8c0;
   --shadow: 0 22px 48px rgba(142, 122, 118, 0.16);
+  --glass-shadow: 0 14px 34px rgba(124, 107, 110, 0.16);
 }
 
 * {
@@ -25,26 +28,37 @@ body {
   background: var(--shell-bg);
   font-family: "Trebuchet MS", "Microsoft YaHei", "Segoe UI", sans-serif;
   color: var(--text-main);
+  min-height: 100dvh;
 }
 
 button {
   font: inherit;
+  cursor: pointer;
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   padding:
-    calc(env(safe-area-inset-top, 0px) + 16px)
-    16px
-    calc(env(safe-area-inset-bottom, 0px) + 18px);
+    calc(var(--safe-area-top) + 14px)
+    12px
+    calc(var(--safe-area-bottom) + 16px);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+.app-shell[data-chrome-mode^="immersive"] {
+  padding: 0;
+  gap: 0;
+}
+
 .top-hud {
   display: grid;
   gap: 10px;
+}
+
+.app-shell[data-chrome-mode^="immersive"] .top-hud {
+  display: none;
 }
 
 .hud-copy {
@@ -112,26 +126,35 @@ button {
 .stage-shell {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   min-height: 0;
+  position: relative;
+}
+
+.app-shell[data-chrome-mode^="immersive"] .stage-shell {
+  min-height: 100dvh;
+  width: 100%;
+  align-items: center;
 }
 
 .stage-frame {
-  --stage-aspect: 0.72;
-  --stage-max-width: 540px;
   position: relative;
-  width: min(100%, var(--stage-max-width));
+  width: min(100%, 402px);
   margin: 0 auto;
-  aspect-ratio: var(--stage-aspect);
   max-width: 100%;
-  max-height: 100%;
-  flex-shrink: 1;
-  border-radius: 28px;
+  flex-shrink: 0;
+  border-radius: 34px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow: var(--shadow);
   background: rgba(255, 255, 255, 0.52);
+}
+
+.app-shell[data-chrome-mode^="immersive"] .stage-frame {
+  border-radius: 28px;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 #game {
@@ -141,6 +164,139 @@ button {
   touch-action: manipulation;
 }
 
+.game-hud,
+.game-audio,
+.status-toast,
+.game-actions,
+.controls-sheet {
+  position: absolute;
+  z-index: 4;
+}
+
+.game-hud[hidden],
+.game-audio[hidden],
+.status-toast[hidden],
+.game-actions[hidden],
+.controls-sheet[hidden] {
+  display: none;
+}
+
+.game-hud {
+  top: calc(var(--safe-area-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.game-hud-pill {
+  min-width: 88px;
+  padding: 8px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 183, 189, 0.35);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px);
+}
+
+.game-hud-pill span {
+  display: block;
+  font-size: 0.68rem;
+  color: #ba848d;
+}
+
+.game-hud-pill strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1.06rem;
+  color: var(--text-strong);
+}
+
+.game-audio {
+  top: calc(var(--safe-area-top) + 10px);
+  right: 10px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 183, 189, 0.35);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--text-strong);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(14px);
+}
+
+.status-toast {
+  left: 50%;
+  bottom: calc(var(--safe-area-bottom) + 78px);
+  transform: translateX(-50%);
+  width: min(calc(100% - 24px), 344px);
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(255, 183, 189, 0.28);
+  box-shadow: var(--glass-shadow);
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+}
+
+.game-actions {
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--safe-area-bottom) + 14px);
+  display: flex;
+  gap: 10px;
+}
+
+.control-fab,
+.sheet-button {
+  min-height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 176, 183, 0.38);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--text-strong);
+  box-shadow: 0 12px 26px rgba(153, 132, 132, 0.14);
+}
+
+.control-fab {
+  flex: 1;
+  padding: 0 14px;
+  backdrop-filter: blur(14px);
+}
+
+.control-fab--secondary {
+  flex: 0 0 108px;
+}
+
+.controls-sheet {
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--safe-area-bottom) + 14px);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 24px;
+  background: rgba(255, 252, 250, 0.96);
+  border: 1px solid rgba(255, 179, 185, 0.4);
+  box-shadow: 0 24px 42px rgba(145, 116, 118, 0.22);
+}
+
+.controls-sheet-title {
+  margin: 0;
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c0848e;
+}
+
+.controls-sheet-actions {
+  display: grid;
+  gap: 10px;
+}
+
 .overlay-layer {
   position: absolute;
   inset: 0;
@@ -148,6 +304,7 @@ button {
   place-items: center;
   padding: 20px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.26));
+  z-index: 6;
 }
 
 .overlay-layer[hidden] {
@@ -183,8 +340,7 @@ button {
   gap: 10px;
 }
 
-.overlay-button,
-.control-button {
+.overlay-button {
   min-height: 48px;
   border-radius: 999px;
   border: 1px solid rgba(255, 176, 183, 0.38);
@@ -194,7 +350,7 @@ button {
 }
 
 .overlay-button--primary,
-.control-button--accent {
+.sheet-button--accent {
   background: linear-gradient(135deg, #ffb4be, #ff8f9e);
   color: #fffdfd;
   border: none;
@@ -230,31 +386,6 @@ button {
   font-weight: 700;
 }
 
-.status-bar {
-  min-height: 48px;
-  margin: 0;
-  padding: 12px 16px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid var(--panel-border);
-  box-shadow: var(--shadow);
-  line-height: 1.45;
-}
-
-.bottom-controls {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.bottom-controls[hidden] {
-  display: none;
-}
-
-.control-button {
-  padding: 0 12px;
-}
-
 .app-shell[data-layout-mode="landscape"] {
   gap: 10px;
 }
@@ -272,6 +403,44 @@ button {
   grid-column: auto;
 }
 
+.app-shell[data-chrome-mode="immersive-landscape"] .game-hud {
+  left: 16px;
+  top: 14px;
+  transform: none;
+}
+
+.app-shell[data-chrome-mode="immersive-landscape"] .game-audio {
+  right: 14px;
+  top: 14px;
+}
+
+.app-shell[data-chrome-mode="immersive-landscape"] .status-toast {
+  left: 16px;
+  bottom: 14px;
+  transform: none;
+  width: 244px;
+  text-align: left;
+}
+
+.app-shell[data-chrome-mode="immersive-landscape"] .game-actions {
+  left: auto;
+  right: 14px;
+  bottom: 14px;
+  width: 186px;
+  flex-direction: column;
+}
+
+.app-shell[data-chrome-mode="immersive-landscape"] .control-fab--secondary {
+  flex-basis: auto;
+}
+
+.app-shell[data-chrome-mode="immersive-landscape"] .controls-sheet {
+  left: auto;
+  right: 14px;
+  width: 236px;
+  bottom: 14px;
+}
+
 @media (max-width: 420px) {
   .app-shell {
     padding-inline: 12px;
@@ -283,9 +452,5 @@ button {
 
   .hud-audio {
     grid-column: 1 / -1;
-  }
-
-  .bottom-controls {
-    grid-template-columns: 1fr;
   }
 }

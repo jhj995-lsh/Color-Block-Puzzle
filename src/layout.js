@@ -3,12 +3,12 @@ export const BOARD_PRESETS = {
     name: "portrait",
     label: "竖屏盘面",
     stage: {
-      width: 432,
-      height: 600,
+      width: 402,
+      height: 430,
     },
     board: {
-      x: 18,
-      y: 120,
+      x: 3,
+      y: 40,
       cols: 18,
       rows: 12,
       cell: 22,
@@ -23,15 +23,15 @@ export const BOARD_PRESETS = {
     name: "landscape",
     label: "横屏盘面",
     stage: {
-      width: 660,
-      height: 480,
+      width: 874,
+      height: 360,
     },
     board: {
-      x: 43,
-      y: 55,
+      x: 191,
+      y: 12,
       cols: 22,
       rows: 15,
-      cell: 25,
+      cell: 22.4,
       radius: 5,
     },
     fillRatio: 0.56,
@@ -58,32 +58,47 @@ export function getStageRatio(presetName) {
   return settings.stage.width / settings.stage.height;
 }
 
+export function getViewportProfile(width, height) {
+  const portraitMatch =
+    height >= width &&
+    Math.abs(width - 402) <= 8 &&
+    Math.abs(height - 874) <= 20;
+  if (portraitMatch) {
+    return "iphone17-standard-portrait";
+  }
+
+  const landscapeMatch =
+    width > height &&
+    Math.abs(width - 874) <= 20 &&
+    Math.abs(height - 402) <= 8;
+  if (landscapeMatch) {
+    return "iphone17-standard-landscape";
+  }
+
+  return "generic-mobile";
+}
+
 export function fitStageFrame({
   presetName,
+  viewportWidth,
   viewportHeight,
-  stageShellWidth,
-  shellPaddingTop = 0,
-  shellPaddingBottom = 0,
-  shellGap = 12,
-  topHeight = 0,
-  statusHeight = 0,
-  controlsHeight = 0,
-  controlsVisible = true,
+  safeAreaTop = 0,
+  safeAreaBottom = 0,
+  chromeMode = "menu",
 }) {
   const settings = getBoardSettings(presetName);
   const aspect = getStageRatio(presetName);
-  const reserveOnlyAboveStage = presetName === "portrait";
-  const visibleSections = controlsVisible ? 4 : 3;
-  const reservedHeight = reserveOnlyAboveStage
-    ? shellPaddingTop + shellPaddingBottom + topHeight + shellGap
-    : shellPaddingTop +
-      shellPaddingBottom +
-      topHeight +
-      statusHeight +
-      controlsHeight +
-      Math.max(0, visibleSections - 1) * shellGap;
-  const availableHeight = Math.max(1, viewportHeight - reservedHeight);
-  const availableWidth = Math.max(1, stageShellWidth);
+  const chromePadding =
+    chromeMode === "immersive-portrait"
+      ? { horizontal: 6, top: 10, bottom: 10 }
+      : chromeMode === "immersive-landscape"
+        ? { horizontal: 12, top: 8, bottom: 8 }
+        : { horizontal: 16, top: 16, bottom: 16 };
+  const availableHeight = Math.max(
+    1,
+    viewportHeight - safeAreaTop - safeAreaBottom - chromePadding.top - chromePadding.bottom
+  );
+  const availableWidth = Math.max(1, viewportWidth - chromePadding.horizontal * 2);
   const width = Math.min(settings.stage.width, availableWidth, availableHeight * aspect);
 
   return {

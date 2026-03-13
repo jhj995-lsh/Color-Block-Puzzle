@@ -60,12 +60,12 @@ const BOARD_PRESETS = {
     name: "portrait",
     label: "竖屏盘面",
     stage: {
-      width: 432,
-      height: 600,
+      width: 402,
+      height: 430,
     },
     board: {
-      x: 18,
-      y: 120,
+      x: 3,
+      y: 40,
       cols: 18,
       rows: 12,
       cell: 22,
@@ -80,15 +80,15 @@ const BOARD_PRESETS = {
     name: "landscape",
     label: "横屏盘面",
     stage: {
-      width: 660,
-      height: 480,
+      width: 874,
+      height: 360,
     },
     board: {
-      x: 43,
-      y: 55,
+      x: 191,
+      y: 12,
       cols: 22,
       rows: 15,
-      cell: 25,
+      cell: 22.4,
       radius: 5,
     },
     fillRatio: 0.56,
@@ -115,30 +115,47 @@ function getStageRatio(presetName) {
   return settings.stage.width / settings.stage.height;
 }
 
+function getViewportProfile(width, height) {
+  const portraitMatch =
+    height >= width &&
+    Math.abs(width - 402) <= 8 &&
+    Math.abs(height - 874) <= 20;
+  if (portraitMatch) {
+    return "iphone17-standard-portrait";
+  }
+
+  const landscapeMatch =
+    width > height &&
+    Math.abs(width - 874) <= 20 &&
+    Math.abs(height - 402) <= 8;
+  if (landscapeMatch) {
+    return "iphone17-standard-landscape";
+  }
+
+  return "generic-mobile";
+}
+
 function fitStageFrame({
   presetName,
+  viewportWidth,
   viewportHeight,
-  stageShellWidth,
-  shellPaddingTop = 0,
-  shellPaddingBottom = 0,
-  shellGap = 12,
-  topHeight = 0,
-  statusHeight = 0,
-  controlsHeight = 0,
-  controlsVisible = true,
+  safeAreaTop = 0,
+  safeAreaBottom = 0,
+  chromeMode = "menu",
 }) {
   const settings = getBoardSettings(presetName);
   const aspect = getStageRatio(presetName);
-  const visibleSections = controlsVisible ? 4 : 3;
-  const reservedHeight =
-    shellPaddingTop +
-    shellPaddingBottom +
-    topHeight +
-    statusHeight +
-    controlsHeight +
-    Math.max(0, visibleSections - 1) * shellGap;
-  const availableHeight = Math.max(1, viewportHeight - reservedHeight);
-  const availableWidth = Math.max(1, stageShellWidth);
+  const chromePadding =
+    chromeMode === "immersive-portrait"
+      ? { horizontal: 6, top: 10, bottom: 10 }
+      : chromeMode === "immersive-landscape"
+        ? { horizontal: 12, top: 8, bottom: 8 }
+        : { horizontal: 16, top: 16, bottom: 16 };
+  const availableHeight = Math.max(
+    1,
+    viewportHeight - safeAreaTop - safeAreaBottom - chromePadding.top - chromePadding.bottom
+  );
+  const availableWidth = Math.max(1, viewportWidth - chromePadding.horizontal * 2);
   const width = Math.min(settings.stage.width, availableWidth, availableHeight * aspect);
 
   return {
@@ -194,14 +211,35 @@ function createAudioController() {
 }
 
   // ---- src/game-rules.js ----
-function createInitialState(layoutMode) {
+function getLeaderboardReturnScreen(state) {
+  return state.prevOverlayScreen === "__play__" ? null : state.prevOverlayScreen || "start";
+}
+
+function getChromeModeForState(state) {
+  if (state.overlayScreen) {
+    return "menu";
+  }
+  return state.layoutMode === "landscape" ? "immersive-landscape" : "immersive-portrait";
+}
+
+function syncChromeMode(state) {
+  state.chromeMode = getChromeModeForState(state);
+  if (state.chromeMode === "menu") {
+    state.controlsSheetOpen = false;
+  }
+}
+
+function createInitialState(layoutMode, viewportProfile = "generic-mobile") {
   const boardPreset = getDefaultBoardPreset(layoutMode);
 
-  return {
+  const state = {
     layoutMode,
+    viewportProfile,
     boardPreset,
     overlayScreen: "explain",
     prevOverlayScreen: "start",
+    chromeMode: "menu",
+    controlsSheetOpen: false,
     score: 0,
     timeLeft: getBoardSettings(boardPreset).maxTime,
     running: false,
@@ -217,6 +255,9 @@ function createInitialState(layoutMode) {
     flyingTiles: [],
     leaderboard: loadLeaderboard(),
   };
+
+  syncChromeMode(state);
+  return state;
 }
 
 function getStorage() {
@@ -275,28 +316,41 @@ function setStatusMessage(state, message) {
   state.statusMessage = message;
 }
 
-function syncLayoutMode(state, layoutMode) {
+function syncLayoutMode(state, layoutMode, viewportProfile = state.viewportProfile) {
   state.layoutMode = layoutMode;
+  state.viewportProfile = viewportProfile;
   if (!state.running && !state.gameOver) {
     state.boardPreset = getDefaultBoardPreset(layoutMode);
     state.timeLeft = getBoardSettings(state.boardPreset).maxTime;
   }
+  syncChromeMode(state);
 }
 
 function dismissExplain(state) {
   state.overlayScreen = "start";
   setStatusMessage(state, STATUS_COPY.start);
+  syncChromeMode(state);
 }
 
 function openLeaderboard(state) {
-  state.prevOverlayScreen = state.overlayScreen || "start";
+  state.prevOverlayScreen = state.overlayScreen === null ? "__play__" : state.overlayScreen || "start";
   state.overlayScreen = "leaderboard";
+  state.controlsSheetOpen = false;
   setStatusMessage(state, STATUS_COPY.leaderboard);
+  syncChromeMode(state);
 }
 
 function closeLeaderboard(state) {
-  state.overlayScreen = state.prevOverlayScreen || "start";
-  setStatusMessage(state, state.overlayScreen === "gameover" ? `本局得分 ${state.score}` : STATUS_COPY.start);
+  state.overlayScreen = getLeaderboardReturnScreen(state);
+  setStatusMessage(
+    state,
+    state.overlayScreen === "gameover"
+      ? `本局得分 ${state.score}`
+      : state.overlayScreen === null
+        ? STATUS_COPY.playing
+        : STATUS_COPY.start
+  );
+  syncChromeMode(state);
 }
 
 function togglePause(state) {
@@ -314,12 +368,21 @@ function toggleColorblind(state) {
   return state.colorblind;
 }
 
+function toggleControlsSheet(state) {
+  if (!state.running || state.gameOver || state.overlayScreen) {
+    return false;
+  }
+  state.controlsSheetOpen = !state.controlsSheetOpen;
+  return state.controlsSheetOpen;
+}
+
 function restartGame(state) {
   const nextPreset = getDefaultBoardPreset(state.layoutMode);
   const settings = getBoardSettings(nextPreset);
 
   state.boardPreset = nextPreset;
   state.overlayScreen = null;
+  state.controlsSheetOpen = false;
   state.score = 0;
   state.timeLeft = settings.maxTime;
   state.running = true;
@@ -331,6 +394,7 @@ function restartGame(state) {
   state.flyingTiles = [];
   setStatusMessage(state, STATUS_COPY.playing);
   makeGrid(state);
+  syncChromeMode(state);
 }
 
 function countBlocks(state) {
@@ -459,7 +523,9 @@ function endGame(state) {
   state.gameOver = true;
   state.paused = false;
   state.overlayScreen = "gameover";
+  state.controlsSheetOpen = false;
   setStatusMessage(state, `本局结束，得分 ${state.score}`);
+  syncChromeMode(state);
 
   if (state.score > 0) {
     const now = new Date();
@@ -575,7 +641,9 @@ function getControlLabels(state) {
     pauseLabel: state.paused ? "继续" : "暂停",
     colorblindLabel: state.colorblind ? "色弱已开" : "色弱模式",
     restartLabel: "重新开始",
+    moreLabel: state.controlsSheetOpen ? "收起" : "更多",
     audioLabel: state.audioEnabled ? "声音 开" : "声音 关",
+    compactAudioLabel: state.audioEnabled ? "音" : "静",
   };
 }
 
@@ -589,8 +657,11 @@ function renderStateToText(state) {
       y: "down",
     },
     layoutMode: state.layoutMode,
+    viewportProfile: state.viewportProfile,
     boardPreset: state.boardPreset,
+    chromeMode: state.chromeMode,
     overlayScreen: state.overlayScreen,
+    controlsSheetOpen: state.controlsSheetOpen,
     score: state.score,
     timeLeft: Number(state.timeLeft.toFixed(2)),
     running: state.running,
@@ -621,7 +692,7 @@ function renderGame(ctx, state) {
   ctx.clearRect(0, 0, stage.width, stage.height);
 
   drawBackdrop(ctx, stage, state.layoutMode);
-  drawBoardPanel(ctx, board, stage);
+  drawBoardPanel(ctx, board);
   drawGridLines(ctx, board);
 
   if (state.grid.length > 0) {
@@ -650,7 +721,9 @@ function renderGame(ctx, state) {
     ctx.fill();
   }
 
-  drawBoardBadge(ctx, settings, stage);
+  if (state.chromeMode === "menu") {
+    drawBoardBadge(ctx, settings, stage);
+  }
 
   if (state.paused) {
     drawCenterLabel(ctx, stage, "暂停中");
@@ -679,7 +752,7 @@ function drawBackdrop(ctx, stage, layoutMode) {
   }
 }
 
-function drawBoardPanel(ctx, board, stage) {
+function drawBoardPanel(ctx, board) {
   const width = board.cols * board.cell;
   const height = board.rows * board.cell;
   const panelX = board.x - 12;
@@ -698,9 +771,6 @@ function drawBoardPanel(ctx, board, stage) {
   ctx.beginPath();
   ctx.roundRect(panelX + 8, panelY + 8, width + 8, height + 8, 22);
   ctx.fill();
-
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.fillRect(0, stage.height - 46, stage.width, 46);
 }
 
 function drawGridLines(ctx, board) {
@@ -998,28 +1068,65 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const appShell = document.getElementById("app-shell");
 const topHud = document.querySelector(".top-hud");
-const stageShell = document.querySelector(".stage-shell");
 const stageFrame = document.getElementById("stage-frame");
 const overlay = document.getElementById("overlay");
-const statusBar = document.getElementById("status-bar");
-const controls = document.getElementById("controls");
-const scoreValue = document.getElementById("hud-score");
-const timeValue = document.getElementById("hud-time");
+const menuScoreValue = document.getElementById("hud-score");
+const menuTimeValue = document.getElementById("hud-time");
 const boardValue = document.getElementById("hud-board");
-const audioButton = document.getElementById("audio-toggle");
+const menuAudioButton = document.getElementById("audio-toggle");
 const titleValue = document.getElementById("hud-title");
 const subtitleValue = document.getElementById("hud-subtitle");
+const gameHud = document.getElementById("game-hud");
+const gameScoreValue = document.getElementById("game-score");
+const gameTimeValue = document.getElementById("game-time");
+const gameAudioButton = document.getElementById("game-audio-toggle");
+const statusToast = document.getElementById("status-toast");
+const gameActions = document.getElementById("game-actions");
+const pauseFab = document.getElementById("pause-fab");
+const moreFab = document.getElementById("more-fab");
+const controlsSheet = document.getElementById("controls-sheet");
+const colorblindButton = document.getElementById("sheet-colorblind");
+const restartButton = document.getElementById("sheet-restart");
+const leaderboardButton = document.getElementById("sheet-leaderboard");
 
 const audio = createAudioController();
-const state = createInitialState(resolveLayoutMode(window.innerWidth, window.innerHeight));
+const initialViewport = getViewportMetrics();
+const state = createInitialState(initialViewport.layoutMode, initialViewport.viewportProfile);
 
 let lastFrameTime = 0;
 let gameOverSoundPlayed = false;
-let shellLayoutKey = "";
 let previousOverlayView = null;
 
 titleValue.textContent = UI_COPY.title;
 subtitleValue.textContent = UI_COPY.subtitle;
+
+function readViewportDimension(key, fallback) {
+  const viewport = window.visualViewport;
+  if (!viewport || typeof viewport[key] !== "number") {
+    return fallback;
+  }
+  return Math.round(viewport[key]);
+}
+
+function readSafeAreaInset(name) {
+  const value = parseFloat(
+    window.getComputedStyle(document.documentElement).getPropertyValue(name) || "0"
+  );
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getViewportMetrics() {
+  const width = readViewportDimension("width", window.innerWidth);
+  const height = readViewportDimension("height", window.innerHeight);
+  return {
+    width,
+    height,
+    layoutMode: resolveLayoutMode(width, height),
+    viewportProfile: getViewportProfile(width, height),
+    safeAreaTop: readSafeAreaInset("--safe-area-top"),
+    safeAreaBottom: readSafeAreaInset("--safe-area-bottom"),
+  };
+}
 
 function getDisplaySettings() {
   return getDisplayBoardSettings(state);
@@ -1045,66 +1152,43 @@ function getBoardCell(clientX, clientY) {
   return { row, col };
 }
 
-function updateLayoutMode() {
-  syncLayoutMode(state, resolveLayoutMode(window.innerWidth, window.innerHeight));
+function updateViewportState() {
+  const viewport = getViewportMetrics();
+  syncLayoutMode(state, viewport.layoutMode, viewport.viewportProfile);
 }
 
 function syncStageFrame() {
-  const preset = state.running || state.gameOver ? state.boardPreset : getDefaultBoardPreset(state.layoutMode);
+  const viewport = getViewportMetrics();
+  const preset =
+    state.running || state.gameOver
+      ? state.boardPreset
+      : getDefaultBoardPreset(state.layoutMode);
   const settings = getDisplaySettings();
   const aspect = getStageRatio(preset);
-  stageFrame.style.setProperty("--stage-aspect", `${aspect}`);
-  stageFrame.style.setProperty("--stage-max-width", `${settings.stage.width}px`);
-  appShell.dataset.layoutMode = state.layoutMode;
-
-  const controlsVisible = !controls.hidden;
-  const shellStyles = window.getComputedStyle(appShell);
-  const shellGap = parseFloat(shellStyles.rowGap || shellStyles.gap || "12");
-  const shellPaddingTop = parseFloat(shellStyles.paddingTop || "0");
-  const shellPaddingBottom = parseFloat(shellStyles.paddingBottom || "0");
-  const topHeight = topHud.getBoundingClientRect().height;
-  const statusHeight = statusBar.getBoundingClientRect().height;
-  const controlsHeight = controlsVisible ? controls.getBoundingClientRect().height : 0;
-  const stageShellWidth = stageShell.getBoundingClientRect().width;
-  const layoutKey = [
-    preset,
-    state.layoutMode,
-    window.innerWidth,
-    window.innerHeight,
-    controlsVisible,
-    Math.round(topHeight),
-    Math.round(statusHeight),
-    Math.round(controlsHeight),
-    Math.round(stageShellWidth),
-  ].join("|");
-
-  if (layoutKey === shellLayoutKey) {
-    return;
-  }
-  shellLayoutKey = layoutKey;
-
   const frameSize = fitStageFrame({
     presetName: preset,
-    viewportHeight: window.innerHeight,
-    stageShellWidth,
-    shellPaddingTop,
-    shellPaddingBottom,
-    shellGap,
-    topHeight,
-    statusHeight,
-    controlsHeight,
-    controlsVisible,
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    safeAreaTop: viewport.safeAreaTop,
+    safeAreaBottom: viewport.safeAreaBottom,
+    chromeMode: state.chromeMode,
   });
 
+  stageFrame.style.setProperty("--stage-aspect", `${aspect}`);
   stageFrame.style.width = `${frameSize.width}px`;
   stageFrame.style.height = `${frameSize.height}px`;
+  stageFrame.style.setProperty("--stage-max-width", `${settings.stage.width}px`);
+
+  appShell.dataset.layoutMode = state.layoutMode;
+  appShell.dataset.chromeMode = state.chromeMode;
+  appShell.dataset.overlayScreen = state.overlayScreen || "play";
+  appShell.dataset.viewportProfile = state.viewportProfile;
 }
 
 function renderOverlay() {
   const settings = getDisplaySettings();
   const nextView = getOverlayView(state, settings);
 
-  appShell.dataset.overlayScreen = nextView.screen;
   overlay.hidden = nextView.hidden;
 
   if (shouldReplaceOverlay(previousOverlayView, nextView)) {
@@ -1114,36 +1198,44 @@ function renderOverlay() {
   previousOverlayView = nextView;
 }
 
-function renderHud() {
+function renderMenuHud() {
   const settings = getDisplaySettings();
   const labels = getControlLabels(state);
-  scoreValue.textContent = String(state.score);
-  timeValue.textContent = `${Math.ceil(state.timeLeft)}`;
+  menuScoreValue.textContent = String(state.score);
+  menuTimeValue.textContent = `${Math.ceil(state.timeLeft)}`;
   boardValue.textContent = `${settings.board.cols}×${settings.board.rows}`;
-  audioButton.textContent = labels.audioLabel;
+  menuAudioButton.textContent = labels.audioLabel;
 }
 
-function renderControls() {
+function renderGameChrome() {
   const labels = getControlLabels(state);
-  const hidden = Boolean(state.overlayScreen);
+  const immersive = state.chromeMode !== "menu";
 
-  controls.hidden = hidden;
-  if (hidden) {
-    return;
-  }
+  topHud.hidden = !state.overlayScreen && immersive;
+  gameHud.hidden = !immersive;
+  gameAudioButton.hidden = !immersive;
+  gameActions.hidden = !immersive;
+  controlsSheet.hidden = !immersive || !state.controlsSheetOpen;
+  statusToast.hidden = !immersive || !state.running;
 
-  controls.querySelector('[data-control="pause"]').textContent = labels.pauseLabel;
-  controls.querySelector('[data-control="colorblind"]').textContent = labels.colorblindLabel;
-  controls.querySelector('[data-control="restart"]').textContent = labels.restartLabel;
+  gameScoreValue.textContent = String(state.score);
+  gameTimeValue.textContent = `${Math.ceil(state.timeLeft)}`;
+  gameAudioButton.textContent = labels.compactAudioLabel;
+  gameAudioButton.setAttribute("aria-label", labels.audioLabel);
+  pauseFab.textContent = labels.pauseLabel;
+  moreFab.textContent = labels.moreLabel;
+  colorblindButton.textContent = labels.colorblindLabel;
+  restartButton.textContent = labels.restartLabel;
+  leaderboardButton.textContent = "排行榜";
 }
 
 function renderStatus() {
-  statusBar.textContent = state.statusMessage;
+  statusToast.textContent = state.statusMessage;
 }
 
 function renderApp() {
-  renderHud();
-  renderControls();
+  renderMenuHud();
+  renderGameChrome();
   renderStatus();
   renderOverlay();
   syncStageFrame();
@@ -1185,23 +1277,33 @@ function handleOverlayAction(action) {
 
 function handleControlAction(action) {
   if (action === "pause") {
-    if (togglePause(state)) {
-      playAudio("button");
-    } else if (state.running && !state.gameOver) {
-      playAudio("button");
-    }
+    togglePause(state);
+    state.controlsSheetOpen = false;
+    playAudio("button");
   } else if (action === "colorblind") {
     toggleColorblind(state);
     playAudio("button");
   } else if (action === "restart") {
     startRound("start");
     return;
+  } else if (action === "leaderboard") {
+    openLeaderboard(state);
+    playAudio("button");
+  } else if (action === "more") {
+    toggleControlsSheet(state);
+    playAudio("button");
   }
 
   renderApp();
 }
 
 function handleCanvasPress(event) {
+  if (state.controlsSheetOpen) {
+    state.controlsSheetOpen = false;
+    renderApp();
+    return;
+  }
+
   if (state.overlayScreen || !state.running || state.paused || state.gameOver) {
     return;
   }
@@ -1258,6 +1360,12 @@ function toggleFullscreen() {
   document.exitFullscreen?.().catch(() => {});
 }
 
+function toggleAudio() {
+  state.audioEnabled = audio.toggle();
+  setStatusMessage(state, state.audioEnabled ? "声音已开启。" : "声音已关闭。");
+  renderApp();
+}
+
 window.render_game_to_text = () => renderStateToText(state);
 window.advanceTime = (ms) => {
   const frameStep = 1000 / 60;
@@ -1271,15 +1379,15 @@ window.advanceTime = (ms) => {
   lastFrameTime = performance.now();
 };
 
-window.addEventListener("resize", () => {
-  updateLayoutMode();
+function handleViewportRefresh() {
+  updateViewportState();
   renderApp();
-});
+}
 
-window.addEventListener("orientationchange", () => {
-  updateLayoutMode();
-  renderApp();
-});
+window.addEventListener("resize", handleViewportRefresh);
+window.addEventListener("orientationchange", handleViewportRefresh);
+window.visualViewport?.addEventListener("resize", handleViewportRefresh);
+window.visualViewport?.addEventListener("scroll", handleViewportRefresh);
 
 window.addEventListener("keydown", (event) => {
   if (event.code === "Space") {
@@ -1294,6 +1402,12 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.code === "Escape" && state.controlsSheetOpen) {
+    state.controlsSheetOpen = false;
+    renderApp();
+    return;
+  }
+
   if (event.code === "KeyP") {
     handleControlAction("pause");
     return;
@@ -1301,6 +1415,11 @@ window.addEventListener("keydown", (event) => {
 
   if (event.code === "KeyC") {
     handleControlAction("colorblind");
+    return;
+  }
+
+  if (event.code === "KeyM") {
+    handleControlAction("more");
     return;
   }
 
@@ -1317,7 +1436,7 @@ overlay.addEventListener("click", (event) => {
   handleOverlayAction(button.dataset.overlayAction);
 });
 
-controls.addEventListener("click", (event) => {
+gameActions.addEventListener("click", (event) => {
   const button = event.target.closest("[data-control]");
   if (!button) {
     return;
@@ -1325,15 +1444,19 @@ controls.addEventListener("click", (event) => {
   handleControlAction(button.dataset.control);
 });
 
-audioButton.addEventListener("click", () => {
-  state.audioEnabled = audio.toggle();
-  setStatusMessage(state, state.audioEnabled ? "声音已开启。" : "声音已关闭。");
-  renderApp();
+controlsSheet.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-control]");
+  if (!button) {
+    return;
+  }
+  handleControlAction(button.dataset.control);
 });
 
+menuAudioButton.addEventListener("click", toggleAudio);
+gameAudioButton.addEventListener("click", toggleAudio);
 canvas.addEventListener("pointerdown", handleCanvasPress);
 
-updateLayoutMode();
+updateViewportState();
 renderApp();
 window.requestAnimationFrame(frame);
 })();

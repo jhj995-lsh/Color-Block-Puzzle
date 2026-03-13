@@ -6,14 +6,35 @@ import {
 } from "./config.js";
 import { getBoardSettings, getDefaultBoardPreset } from "./layout.js";
 
-export function createInitialState(layoutMode) {
+function getLeaderboardReturnScreen(state) {
+  return state.prevOverlayScreen === "__play__" ? null : state.prevOverlayScreen || "start";
+}
+
+export function getChromeModeForState(state) {
+  if (state.overlayScreen) {
+    return "menu";
+  }
+  return state.layoutMode === "landscape" ? "immersive-landscape" : "immersive-portrait";
+}
+
+function syncChromeMode(state) {
+  state.chromeMode = getChromeModeForState(state);
+  if (state.chromeMode === "menu") {
+    state.controlsSheetOpen = false;
+  }
+}
+
+export function createInitialState(layoutMode, viewportProfile = "generic-mobile") {
   const boardPreset = getDefaultBoardPreset(layoutMode);
 
-  return {
+  const state = {
     layoutMode,
+    viewportProfile,
     boardPreset,
     overlayScreen: "explain",
     prevOverlayScreen: "start",
+    chromeMode: "menu",
+    controlsSheetOpen: false,
     score: 0,
     timeLeft: getBoardSettings(boardPreset).maxTime,
     running: false,
@@ -29,6 +50,9 @@ export function createInitialState(layoutMode) {
     flyingTiles: [],
     leaderboard: loadLeaderboard(),
   };
+
+  syncChromeMode(state);
+  return state;
 }
 
 function getStorage() {
@@ -87,28 +111,41 @@ export function setStatusMessage(state, message) {
   state.statusMessage = message;
 }
 
-export function syncLayoutMode(state, layoutMode) {
+export function syncLayoutMode(state, layoutMode, viewportProfile = state.viewportProfile) {
   state.layoutMode = layoutMode;
+  state.viewportProfile = viewportProfile;
   if (!state.running && !state.gameOver) {
     state.boardPreset = getDefaultBoardPreset(layoutMode);
     state.timeLeft = getBoardSettings(state.boardPreset).maxTime;
   }
+  syncChromeMode(state);
 }
 
 export function dismissExplain(state) {
   state.overlayScreen = "start";
   setStatusMessage(state, STATUS_COPY.start);
+  syncChromeMode(state);
 }
 
 export function openLeaderboard(state) {
-  state.prevOverlayScreen = state.overlayScreen || "start";
+  state.prevOverlayScreen = state.overlayScreen === null ? "__play__" : state.overlayScreen || "start";
   state.overlayScreen = "leaderboard";
+  state.controlsSheetOpen = false;
   setStatusMessage(state, STATUS_COPY.leaderboard);
+  syncChromeMode(state);
 }
 
 export function closeLeaderboard(state) {
-  state.overlayScreen = state.prevOverlayScreen || "start";
-  setStatusMessage(state, state.overlayScreen === "gameover" ? `本局得分 ${state.score}` : STATUS_COPY.start);
+  state.overlayScreen = getLeaderboardReturnScreen(state);
+  setStatusMessage(
+    state,
+    state.overlayScreen === "gameover"
+      ? `本局得分 ${state.score}`
+      : state.overlayScreen === null
+        ? STATUS_COPY.playing
+        : STATUS_COPY.start
+  );
+  syncChromeMode(state);
 }
 
 export function togglePause(state) {
@@ -126,12 +163,21 @@ export function toggleColorblind(state) {
   return state.colorblind;
 }
 
+export function toggleControlsSheet(state) {
+  if (!state.running || state.gameOver || state.overlayScreen) {
+    return false;
+  }
+  state.controlsSheetOpen = !state.controlsSheetOpen;
+  return state.controlsSheetOpen;
+}
+
 export function restartGame(state) {
   const nextPreset = getDefaultBoardPreset(state.layoutMode);
   const settings = getBoardSettings(nextPreset);
 
   state.boardPreset = nextPreset;
   state.overlayScreen = null;
+  state.controlsSheetOpen = false;
   state.score = 0;
   state.timeLeft = settings.maxTime;
   state.running = true;
@@ -143,6 +189,7 @@ export function restartGame(state) {
   state.flyingTiles = [];
   setStatusMessage(state, STATUS_COPY.playing);
   makeGrid(state);
+  syncChromeMode(state);
 }
 
 export function countBlocks(state) {
@@ -271,7 +318,9 @@ export function endGame(state) {
   state.gameOver = true;
   state.paused = false;
   state.overlayScreen = "gameover";
+  state.controlsSheetOpen = false;
   setStatusMessage(state, `本局结束，得分 ${state.score}`);
+  syncChromeMode(state);
 
   if (state.score > 0) {
     const now = new Date();
@@ -387,7 +436,9 @@ export function getControlLabels(state) {
     pauseLabel: state.paused ? "继续" : "暂停",
     colorblindLabel: state.colorblind ? "色弱已开" : "色弱模式",
     restartLabel: "重新开始",
+    moreLabel: state.controlsSheetOpen ? "收起" : "更多",
     audioLabel: state.audioEnabled ? "声音 开" : "声音 关",
+    compactAudioLabel: state.audioEnabled ? "音" : "静",
   };
 }
 
@@ -401,8 +452,11 @@ export function renderStateToText(state) {
       y: "down",
     },
     layoutMode: state.layoutMode,
+    viewportProfile: state.viewportProfile,
     boardPreset: state.boardPreset,
+    chromeMode: state.chromeMode,
     overlayScreen: state.overlayScreen,
+    controlsSheetOpen: state.controlsSheetOpen,
     score: state.score,
     timeLeft: Number(state.timeLeft.toFixed(2)),
     running: state.running,
