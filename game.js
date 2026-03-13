@@ -82,7 +82,7 @@
       }
       try {
         clip.currentTime = 0;
-        clip.play().catch(() => {});
+        clip.play().catch(() => { });
       } catch {
         // Ignore autoplay restrictions until user interacts.
       }
@@ -190,9 +190,9 @@
       state.particles.push({
         x,
         y,
-        vx: Math.cos(angle) * (36 + Math.random() * 28),
-        vy: Math.sin(angle) * (36 + Math.random() * 28),
-        life: 0.4,
+        vx: Math.cos(angle) * (150 + Math.random() * 50),
+        vy: Math.sin(angle) * (150 + Math.random() * 50),
+        life: 0.6,
         color,
       });
     }
@@ -202,11 +202,11 @@
     state.flyingTiles.push({
       x,
       y,
-      vx: (Math.random() - 0.5) * 140,
-      vy: -60 - Math.random() * 80,
+      vx: (Math.random() - 0.5) * 350,
+      vy: -300 - Math.random() * 200,
       rotation: (Math.random() - 0.5) * 0.7,
-      angularVelocity: (Math.random() - 0.5) * 10,
-      life: 0.55,
+      angularVelocity: (Math.random() - 0.5) * 15,
+      life: 1.0,
       color,
     });
   }
@@ -242,7 +242,7 @@
     for (const tile of state.flyingTiles) {
       tile.x += tile.vx * dt;
       tile.y += tile.vy * dt;
-      tile.vy += 240 * dt;
+      tile.vy += 1500 * dt;
       tile.rotation += tile.angularVelocity * dt;
       tile.life -= dt;
     }
@@ -555,7 +555,7 @@
   function drawFlyingTiles() {
     for (const tile of state.flyingTiles) {
       ctx.save();
-      ctx.globalAlpha = Math.max(0, tile.life * 1.7);
+      ctx.globalAlpha = Math.max(0, Math.min(1, tile.life * 1.5));
       ctx.translate(tile.x, tile.y);
       ctx.rotate(tile.rotation);
       ctx.fillStyle = tile.color;
