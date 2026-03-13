@@ -66,6 +66,24 @@ test("fitStageFrame keeps the portrait stage within the available viewport", () 
   assert.equal(frame.width / frame.height < 0.73, true);
 });
 
+test("fitStageFrame keeps portrait boards readable on tall phones with stacked controls", () => {
+  const frame = fitStageFrame({
+    presetName: "portrait",
+    viewportHeight: 852,
+    stageShellWidth: 361,
+    shellPaddingTop: 32,
+    shellPaddingBottom: 24,
+    shellGap: 12,
+    topHeight: 332,
+    statusHeight: 64,
+    controlsHeight: 182,
+    controlsVisible: true,
+  });
+
+  assert.equal(frame.width >= 320, true);
+  assert.equal(frame.width <= 361, true);
+});
+
 test("fitStageFrame shrinks the landscape stage when vertical space is limited", () => {
   const frame = fitStageFrame({
     presetName: "landscape",

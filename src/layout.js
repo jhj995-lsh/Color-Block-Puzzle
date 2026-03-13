@@ -72,14 +72,16 @@ export function fitStageFrame({
 }) {
   const settings = getBoardSettings(presetName);
   const aspect = getStageRatio(presetName);
+  const reserveOnlyAboveStage = presetName === "portrait";
   const visibleSections = controlsVisible ? 4 : 3;
-  const reservedHeight =
-    shellPaddingTop +
-    shellPaddingBottom +
-    topHeight +
-    statusHeight +
-    controlsHeight +
-    Math.max(0, visibleSections - 1) * shellGap;
+  const reservedHeight = reserveOnlyAboveStage
+    ? shellPaddingTop + shellPaddingBottom + topHeight + shellGap
+    : shellPaddingTop +
+      shellPaddingBottom +
+      topHeight +
+      statusHeight +
+      controlsHeight +
+      Math.max(0, visibleSections - 1) * shellGap;
   const availableHeight = Math.max(1, viewportHeight - reservedHeight);
   const availableWidth = Math.max(1, stageShellWidth);
   const width = Math.min(settings.stage.width, availableWidth, availableHeight * aspect);
